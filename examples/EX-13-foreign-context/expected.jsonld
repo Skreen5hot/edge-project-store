@@ -1,0 +1,15 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "ProjectReport",
+  "contractVersion": 1,
+  "project": null,
+  "valid": false,
+  "stages": {},
+  "artifacts": [],
+  "diagnostics": [
+    {
+      "code": "E-CTX-EXTERNAL",
+      "path": "edge-project.jsonld"
+    }
+  ]
+}

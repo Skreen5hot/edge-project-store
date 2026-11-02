@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skreen5hot.github.io/edge-project-store/schemas/artifact-record-v1.schema.json",
+  "title": "edge-project-store ArtifactRecord, contract version 1",
+  "description": "Shape of <artifact file name>.record.jsonld (EPS R-P4). An input is either an artifact reference {role, path, sha256}, whose path is any relative path (R-B6, R-P4.8) or the source collection {role, collection, members}. Ordering rules (R-P4) and cross-file rules are checked by the contract, not by this schema. Property order is the canonical key order (R-B1).",
+  "type": "object",
+  "required": [
+    "@context",
+    "@type",
+    "contractVersion",
+    "project",
+    "stage",
+    "path",
+    "kind",
+    "sha256",
+    "bytes",
+    "generation",
+    "producedBy",
+    "inputs",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "@context": {
+      "$ref": "#/$defs/context"
+    },
+    "@type": {
+      "const": "ArtifactRecord"
+    },
+    "contractVersion": {
+      "const": 1
+    },
+    "project": {
+      "$ref": "#/$defs/projectId"
+    },
+    "stage": {
+      "enum": [
+        "source",
+        "normalized",
+        "sdd",
+        "rml",
+        "rdf",
+        "graph",
+        "diagrams"
+      ]
+    },
+    "path": {
+      "$ref": "#/$defs/artifactPath"
+    },
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,39}$"
+    },
+    "sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "bytes": {
+      "type": "integer"
+    },
+    "generation": {
+      "enum": [
+        "received",
+        "deterministic",
+        "assisted"
+      ]
+    },
+    "producedBy": {
+      "$ref": "#/$defs/producedBy"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/input"
+      }
+    },
+    "createdAt": {
+      "$ref": "#/$defs/timestamp"
+    }
+  },
+  "$defs": {
+    "context": {
+      "const": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,39}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "pattern": "^(source|normalized|sdd|rml|rdf|graph|diagrams)/[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\\.[a-z0-9]{1,10}$"
+    },
+    "producedBy": {
+      "type": "object",
+      "required": [
+        "responsibility",
+        "tool",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "responsibility": {
+          "enum": [
+            "intake",
+            "normalizer",
+            "sdd-author",
+            "rml-generator",
+            "rdf-generator",
+            "graph-loader",
+            "diagram-exporter"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z.+-]{1,64}$"
+        }
+      }
+    },
+    "input": {
+      "if": {
+        "type": "object",
+        "required": [
+          "collection"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "role",
+          "collection",
+          "members"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/role"
+          },
+          "collection": {
+            "const": "source"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      },
+      "else": {
+        "$ref": "#/$defs/inputRef"
+      }
+    },
+    "relativePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$"
+    },
+    "inputRef": {
+      "type": "object",
+      "required": [
+        "role",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

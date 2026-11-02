@@ -1,0 +1,19 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "ArtifactRecord",
+  "contractVersion": 1,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000017",
+  "stage": "source",
+  "path": "source/schema-20261101T090500Z-51312011.json",
+  "kind": "schema",
+  "sha256": "513120117a1b477b10d66143c278ed129ef7e5d7445029926ce223ee3d90f9cf",
+  "bytes": 26,
+  "generation": "received",
+  "producedBy": {
+    "responsibility": "intake",
+    "tool": "example-intake",
+    "version": "0.1.0"
+  },
+  "inputs": [],
+  "createdAt": "2026-11-01T09:05:00Z"
+}

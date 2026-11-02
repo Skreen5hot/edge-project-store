@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skreen5hot.github.io/edge-project-store/schemas/stage-revision-v1.schema.json",
+  "title": "edge-project-store StageRevision, contract version 1",
+  "description": "Shape of <stage>/revisions/rev-<time>-<sha8>.jsonld (EPS R-P5). Property order is the canonical key order (R-B1).",
+  "type": "object",
+  "required": [
+    "@context",
+    "@type",
+    "contractVersion",
+    "project",
+    "stage",
+    "parents",
+    "current",
+    "producedBy",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "@context": {
+      "$ref": "#/$defs/context"
+    },
+    "@type": {
+      "const": "StageRevision"
+    },
+    "contractVersion": {
+      "const": 1
+    },
+    "project": {
+      "$ref": "#/$defs/projectId"
+    },
+    "stage": {
+      "enum": [
+        "normalized",
+        "sdd",
+        "rml",
+        "rdf",
+        "graph",
+        "diagrams"
+      ]
+    },
+    "parents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "current": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      }
+    },
+    "producedBy": {
+      "$ref": "#/$defs/producedBy"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/timestamp"
+    }
+  },
+  "$defs": {
+    "context": {
+      "const": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,39}$"
+    },
+    "artifactPath": {
+      "type": "string",
+      "pattern": "^(source|normalized|sdd|rml|rdf|graph|diagrams)/[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\\.[a-z0-9]{1,10}$"
+    },
+    "producedBy": {
+      "type": "object",
+      "required": [
+        "responsibility",
+        "tool",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "responsibility": {
+          "enum": [
+            "intake",
+            "normalizer",
+            "sdd-author",
+            "rml-generator",
+            "rdf-generator",
+            "graph-loader",
+            "diagram-exporter"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z.+-]{1,64}$"
+        }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "required": [
+        "role",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "path": {
+          "$ref": "#/$defs/artifactPath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

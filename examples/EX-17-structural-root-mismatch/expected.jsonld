@@ -1,0 +1,125 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "ProjectReport",
+  "contractVersion": 1,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000017",
+  "valid": true,
+  "stages": {
+    "source": {
+      "status": "ok",
+      "heads": [],
+      "current": [
+        "source/schema-20261101T090000Z-67daa493.json",
+        "source/schema-20261101T090500Z-51312011.json"
+      ]
+    },
+    "normalized": {
+      "status": "ok",
+      "heads": [
+        "normalized/revisions/rev-20261101T092000Z-989ca42b.jsonld"
+      ],
+      "current": [
+        "normalized/normalized-20261101T091000Z-4c173267.json",
+        "normalized/normalized-20261101T091500Z-419d9aeb.json"
+      ]
+    },
+    "sdd": {
+      "status": "ok",
+      "heads": [
+        "sdd/revisions/rev-20261101T100001Z-83e0acf1.jsonld"
+      ],
+      "current": [
+        "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
+      ]
+    },
+    "rml": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "rdf": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "graph": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "diagrams": {
+      "status": "ok",
+      "heads": [
+        "diagrams/revisions/rev-20261101T110001Z-044d530c.jsonld"
+      ],
+      "current": [
+        "diagrams/diagram-20261101T110000Z-89caee25.mmd"
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "path": "diagrams/diagram-20261101T110000Z-89caee25.mmd",
+      "sha256": "89caee2599e6c6930e9c697f791e2e49e712c674e6dba15c2574522ad811c8b5",
+      "stage": "diagrams",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": false,
+      "notReadyBecause": [
+        "STRUCTURAL-ROOT-MISMATCH"
+      ]
+    },
+    {
+      "path": "normalized/normalized-20261101T091000Z-4c173267.json",
+      "sha256": "4c173267a5cb85aa5b8b4aa74123b78b7d874cea12df85c936a506a500b8b206",
+      "stage": "normalized",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": true,
+      "notReadyBecause": []
+    },
+    {
+      "path": "normalized/normalized-20261101T091500Z-419d9aeb.json",
+      "sha256": "419d9aeb91a0acd613984f00aa211ebdd57c8b9f71e74efdb7d7e870a513a6ee",
+      "stage": "normalized",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": true,
+      "notReadyBecause": []
+    },
+    {
+      "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
+      "sha256": "fa7eae251194bc3b01c984da8d2e5308b0fb5b00c20080b2f60203190c30576c",
+      "stage": "sdd",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": true,
+      "notReadyBecause": []
+    },
+    {
+      "path": "source/schema-20261101T090000Z-67daa493.json",
+      "sha256": "67daa4932a8fed8743a0a85b09b9376d50de79fa72a87d4d5e023d73b0727a41",
+      "stage": "source",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": null,
+      "notReadyBecause": []
+    },
+    {
+      "path": "source/schema-20261101T090500Z-51312011.json",
+      "sha256": "513120117a1b477b10d66143c278ed129ef7e5d7445029926ce223ee3d90f9cf",
+      "stage": "source",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "pipelineReady": null,
+      "notReadyBecause": []
+    }
+  ],
+  "diagnostics": []
+}
