@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-a5c9e975.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-a5c9e975bea632db43b097d631a37523691ca2be62bbd9fdf05fceeb406478c7.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "damaged",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-54877f10.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-54877f10506993b8432b4a8bf74978e8867ab4d35f57509e21e2d2cc88305716.jsonld"
       ],
       "current": []
     },
@@ -57,6 +57,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -67,6 +69,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }
@@ -74,7 +78,7 @@
   "diagnostics": [
     {
       "code": "E-CURRENT-UNRESOLVED",
-      "path": "sdd/revisions/rev-20261101T100001Z-54877f10.jsonld"
+      "path": "sdd/revisions/rev-20261101T100001Z-54877f10506993b8432b4a8bf74978e8867ab4d35f57509e21e2d2cc88305716.jsonld"
     },
     {
       "code": "E-INTEGRITY",

@@ -1,0 +1,121 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "ProjectReport",
+  "contractVersion": 1,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000025",
+  "valid": true,
+  "stages": {
+    "source": {
+      "status": "ok",
+      "heads": [],
+      "current": [
+        "source/schema-20261101T090000Z-67daa493.json"
+      ]
+    },
+    "normalized": {
+      "status": "ok",
+      "heads": [
+        "normalized/revisions/rev-20261101T091001Z-771554be53b61625f7ff59f86ed9f4d67fe712aeeebb13d918cd3772d147b65c.jsonld"
+      ],
+      "current": [
+        "normalized/normalized-20261101T091000Z-4c173267.json"
+      ]
+    },
+    "sdd": {
+      "status": "conflicted",
+      "heads": [
+        "sdd/revisions/rev-20261101T120001Z-34a38db98c7c591d3dab880dec78f394fa302133c92926662251a14e8d8ed768.jsonld",
+        "sdd/revisions/rev-20261101T120002Z-e9409876c6e032d02ca4346d97651bfc80733b56184a1ec98d0677cf5c4db93a.jsonld"
+      ],
+      "current": []
+    },
+    "rml": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "rdf": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "graph": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    },
+    "diagrams": {
+      "status": "empty",
+      "heads": [],
+      "current": []
+    }
+  },
+  "artifacts": [
+    {
+      "path": "normalized/normalized-20261101T091000Z-4c173267.json",
+      "sha256": "4c173267a5cb85aa5b8b4aa74123b78b7d874cea12df85c936a506a500b8b206",
+      "stage": "normalized",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
+      "pipelineReady": true,
+      "notReadyBecause": []
+    },
+    {
+      "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
+      "sha256": "fa7eae251194bc3b01c984da8d2e5308b0fb5b00c20080b2f60203190c30576c",
+      "stage": "sdd",
+      "inStageCurrent": false,
+      "upToDate": true,
+      "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
+      "pipelineReady": false,
+      "notReadyBecause": [
+        "NOT-CURRENT"
+      ]
+    },
+    {
+      "path": "sdd/sdd-20261101T120000Z-47619140.jsonld",
+      "sha256": "476191407fac1b6db1a327d89734e0cef2c3fcdaa5e2737a67f442f7b40aeb20",
+      "stage": "sdd",
+      "inStageCurrent": false,
+      "upToDate": true,
+      "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
+      "pipelineReady": false,
+      "notReadyBecause": [
+        "NOT-CURRENT"
+      ]
+    },
+    {
+      "path": "source/schema-20261101T090000Z-67daa493.json",
+      "sha256": "67daa4932a8fed8743a0a85b09b9376d50de79fa72a87d4d5e023d73b0727a41",
+      "stage": "source",
+      "inStageCurrent": true,
+      "upToDate": true,
+      "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
+      "pipelineReady": null,
+      "notReadyBecause": []
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "E-STAGE-CONFLICT",
+      "path": "sdd"
+    },
+    {
+      "code": "W-FOREIGN-FILE",
+      "path": "sdd/sdd-20261101T120000Z-47619140-DESKTOP-B.jsonld"
+    },
+    {
+      "code": "W-FOREIGN-FILE",
+      "path": "sdd/sdd-20261101T120000Z-47619140.jsonld.record-DESKTOP-B.jsonld"
+    }
+  ]
+}

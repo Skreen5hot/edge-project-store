@@ -25,7 +25,8 @@ The tools share a **folder contract**, not a server, a database or a common appl
 1. A **project** is a folder the user picks. `edge-project.jsonld` gives it a permanent `urn:uuid:` identity.
 2. Each **stage** has a subfolder and one **responsibility** that writes it. `source/` is a shared intake area that
    any tool may add to, and nothing in it is ever changed.
-3. **Nothing is overwritten.** Artifacts, their records and the stage's revisions are only ever created.
+3. **Committed state is never overwritten.** Artifacts, their records and the stage's revisions are only ever
+   created. Work in progress (point 6) is the one mutable exception.
 4. Each artifact has a **record** naming its exact inputs by path and SHA-256. A stage's state is a chain of
    **revisions**, each naming its parent revisions, much like commits.
 5. One pure **evaluation** turns a folder into a report: what is current, what is out of date and why (recursively,
@@ -46,9 +47,33 @@ The tools share a **folder contract**, not a server, a database or a common appl
 | Actual atomic-write guarantees | Documented per backend (Node: temp file, `fsync`, `link()` as an atomic create-if-absent, with a `rename()` fallback; browser: temp file and `move()`, with a direct-write fallback that relies on Chromium behaviour). Correctness never depends on atomicity, because every file is checked against a hash. Cloud-folder behaviour is to be verified in slice 3. | EPS §11 |
 | Normalized schema as the structural source of truth | **Pipeline readiness** requires every artifact after `normalized/` to trace back to exactly one normalized schema. An SDD built straight from a source schema is allowed and recorded honestly, but it is never pipeline-ready, and nothing may mix two normalized schemas. | EPS R-E7; EX-07, EX-17 |
 
-One more rule came out of checking the examples: an artifact may cite an earlier artifact **of its own stage**, for
-example the previous SDD that a rerun builds on. That input is history, not a dependency: it is checked for presence
-only, so superseding the old SDD does not mark the new one out of date (EPS R-E6; EX-19).
+### Second review (2026-11-02)
+
+| Review point | Resolution | Where |
+|---|---|---|
+| D3: committed vs working state | The "never overwritten" guarantee is stated for committed state only (artifacts, records, revisions). `work/` files are mutable and can meet sync conflicts; a tool detects that itself, for example by recording the revision a work file was based on. | EPS §1, §9 |
+| D3: filename collisions | Names carry a hash **prefix** of 8, 16, 32 or 64 characters. A writer tries 8 first and extends the prefix whenever the name holds different bytes; it never overwrites. Readers always compare the full SHA-256 in the record. | EPS R-B2–R-B4, R-W1; EX-22 |
+| D9: dependency vs history | Every artifact input now declares `relation`: `dependency` (freshness and structural roots follow it) or `history` (provenance: verified for identity and integrity, no effect on freshness or roots). Nothing is implied by the input's stage. A same-stage dependency is exempt only from "superseded", because the artifact that uses it normally supersedes it; its own staleness still propagates. | EPS R-P4, R-E6, R-E7, R-E9; EX-19, EX-20, EX-21 |
+| Relative paths: safety | The schema accepts any string. The contract then defines a **safe path** (stage-rooted, `/`-separated, restricted characters, no `.`/`..`, no drive letters, backslashes, trailing dots or Windows device names, exact case) and refuses others with E-PATH-UNSAFE **before** the work-folder rule and before any file is opened. Readers never follow links or junctions. | EPS R-B6, R-P4.8–9, R-E2; EX-16, EX-23 |
+| Source members lose file identity | Collection members are `{path, sha256}` pairs, compared as pairs, so a rename registers as well as additions, removals and edits. | EPS R-P4, R-E6; EX-03–EX-05 |
+| Canonical serialization | R-B1 now states the full form (key order from the schemas, layout, string escaping, numbers) so a writer in any language can reproduce it. Readers never re-serialize; identity is the hash of the bytes. | EPS R-B1 |
+
+### Independent contract review (2026-11-02)
+
+The registrar's independent evaluator agreed with all 23 expected reports. The review found contradictions and
+untested cases outside them, resolved as follows:
+
+| Finding | Resolution | Where |
+|---|---|---|
+| 1. Source deletion contradicted append-only | Conforming writers never delete, rename or modify any committed file, source included, and uncommitted ones neither (they may be another writer's commit in progress). People can still change their own folders; that is an **external mutation** the evaluation reports. No retirement operation exists in v0.1. Recovery is by retrying, never by deleting. | EPS R-W1, R-W7, R-W10, §10, §14; EX-04, EX-05, EX-11 |
+| 2. Fallback writes could overwrite | Two declared **guarantee levels**: *exclusive* (atomic create-if-absent; nothing is overwritten) and *checked* (check, then create; a racing program can be overwritten, and this is stated with what is and is not detected). A writer must use exclusive wherever available and never `rename()` onto a name that may exist. Node is exclusive in both its paths (`link()`, else `open(…, 'wx')`); the browser API has no exclusive create, so it is checked. | EPS R-W9, §11 |
+| 3. 8-character prefixes vs the cross-machine claim | Revision names now carry the **full** SHA-256, so two different revisions can never share a name and sync can never hide a branch. Artifact names keep the short prefix; a cross-machine artifact collision is detected (both full-hash revisions arrive and conflict; the copy is reported), and the recovery is defined. EX-25 uses a real 8-character collision. | EPS R-B3, R-B4, §9, §10; EX-25 |
+| 4. R-W6 vs the work-folder exclusion | R-W6 now requires disclosure of every **committed** project artifact that materially contributed. What a tool takes from `work/` becomes part of the artifact's own content, like a person's decisions. | EPS R-W6, R-P6 |
+| 5. Cycles were untested and order-dependent | Cycles are defined on the dependency graph (mutual reachability), not on a traversal: inputs on a common cycle get `CYCLE`, artifacts outside it that depend on it get `UPSTREAM-OUT-OF-DATE`, and structural roots visit each artifact once. | EPS R-E6, R-E7; EX-24 |
+| Same bytes, different provenance | An identical artifact is reused only if its record is also byte-identical; otherwise the writer takes a later `createdAt`, giving a new name and its own record. | EPS R-W1 |
+| Negative `bytes` | `minimum: 0` in the record schema. | `schemas/artifact-record-v1.schema.json` |
+| Rule references | The work-folder rule is R-P4.9 everywhere. | EPS R-P6; examples index |
+| D11 terminology | `pipelineReady` is defined as structural readiness for downstream processing only, not completeness of provenance, verified history or authenticity. | EPS R-E7 |
 
 ## 4. The module (slices 2 and 3)
 
@@ -94,7 +119,7 @@ and which time it records) are settled in the SDD tool's own proposal.
 
 | # | Slice | Delivers | Status |
 |---|---|---|---|
-| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 19 example projects with expected reports | **draft, for review** |
+| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | **draft, for review** |
 | 2 | Contract module + memory backend | The pure evaluation and project API, judged against the examples | after review of slice 1 |
 | 3 | Node and browser backends | `node:fs` and File System Access backends, browser session handling, cloud-folder verification (§11) | |
 | 4 | SDD project mode (SDD v1.1) | The SDD tool vendors the module: project folder, resume, Reopen; CLI `--project <dir>` | |
@@ -112,11 +137,16 @@ renaming a project (v0.1).
 |---|---|---|
 | D1 | The project folder is the integration contract; tools share no runtime. | approved (direction) |
 | D2 | One responsibility writes each stage folder; any tool may read every folder. | approved (direction) |
-| D3 | Nothing is overwritten: artifacts, records and revisions are only created; a stage's state is its revision graph. | proposed (replaces the mutable `stage.json` of the first draft) |
+| D3 | Committed state is never overwritten: artifacts, records and revisions are only created; a stage's state is its revision graph; names extend their hash prefix on collision. | **approved** (second review), with the two qualifications applied |
 | D4 | Work in progress lives in `<stage>/work/` and is never an input. | approved (direction) |
 | D5 | `source/` is a shared intake area, exempt from the single-writer rule: any tool may add a file; files are immutable and identified by content hash; membership changes are detected. | **approved with conditions** (EPS R-W7, R-E4) |
 | D6 | Session restore brings back proposals, rejections and unsaved acceptances, marked as unsaved; nothing is committed on resume; changed inputs require revalidation. | **revised by the registrar** (SDD-side, §5) |
 | D7 | `diagrams/` is owned by the `diagram-exporter` responsibility, which may run inside another tool. | **approved** (EPS §3) |
 | D8 | MIT licence; the adapted mermaid code is CC0. | proposed |
-| D9 | Same-stage inputs are history only (checked for presence, no staleness or structural-root effect). | proposed (EPS R-E6) |
+| D9 | Every input declares `dependency` or `history`; history is verified for identity and integrity but does not affect freshness or structural roots; same-stage inputs are not automatically history; a same-stage dependency is exempt only from "superseded". | **approved** (independent review) |
 | D10 | The repository stays local until the revised contract and slice 1 are reviewed. | **registrar** |
+| D11 | Unverified history (`historyVerified: false`) is reported but does not block `pipelineReady`, which means structural readiness only. | **approved** (independent review) |
+| D12 | Input paths: the schema accepts any string; the contract's safe-path rule refuses unsafe ones (E-PATH-UNSAFE) before the work-folder rule. | **approved with constraints** (second review), constraints applied |
+| D13 | Writers never delete or modify committed files; people's changes are external mutations that the evaluation reports; no retirement operation in v0.1. | proposed (finding 1) |
+| D14 | Backends declare a write guarantee level, *exclusive* or *checked*; exclusive is mandatory where available. | proposed (finding 2) |
+| D15 | Revision names carry the full SHA-256; artifact names keep the short prefix, with cross-machine collisions detected and recoverable. | proposed (finding 3) |

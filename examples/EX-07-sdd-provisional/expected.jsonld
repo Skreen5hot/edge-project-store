@@ -20,7 +20,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-3018ffee.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-3018ffeec7b0cc2d20b2421ab43eeede611a0f43e9b863c62adac664aaa8eae7.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-931f35ae.jsonld"
@@ -55,6 +55,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NO-STRUCTURAL-ROOT"
@@ -67,6 +69,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

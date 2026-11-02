@@ -15,7 +15,7 @@
     "normalized": {
       "status": "out-of-date",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-2d2ff1e1.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-2d2ff1e1cf7d6fdc4cb121ad6348249e485cca2a4309bc40428e7790177bc470.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-fcb8d199.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "out-of-date",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-1b973751.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-1b9737519d8b216bd68765ae0b9d450c6b4293bc1ec4e2671d1e8b4b35683ece.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -64,10 +64,15 @@
           "input": "source",
           "added": [],
           "removed": [
-            "9f2b5ce5e7c21816fe07b15446fab5420065b1f7ed8ff819877d1b2254b836f9"
+            {
+              "path": "source/sample-20261101T090500Z-9f2b5ce5.csv",
+              "sha256": "9f2b5ce5e7c21816fe07b15446fab5420065b1f7ed8ff819877d1b2254b836f9"
+            }
           ]
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE"
@@ -85,6 +90,8 @@
           "input": "normalized/normalized-20261101T091000Z-fcb8d199.json"
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE"
@@ -97,6 +104,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

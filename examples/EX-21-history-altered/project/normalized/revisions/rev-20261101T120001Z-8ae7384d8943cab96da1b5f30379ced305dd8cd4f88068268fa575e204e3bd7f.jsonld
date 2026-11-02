@@ -1,0 +1,23 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "StageRevision",
+  "contractVersion": 1,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000021",
+  "stage": "normalized",
+  "parents": [
+    "a65d8f9becfddef85183e1b388b12b24c2f6b41163c24eb27a2ebae2cf01aa7f"
+  ],
+  "current": [
+    {
+      "role": "normalized",
+      "path": "normalized/normalized-20261101T120000Z-7b20871f.json",
+      "sha256": "7b20871f061b6f275040ecc230964a3edce073f25ba8dddb0b528dc473dc911f"
+    }
+  ],
+  "producedBy": {
+    "responsibility": "normalizer",
+    "tool": "example-normalizer",
+    "version": "0.1.0"
+  },
+  "createdAt": "2026-11-01T12:00:01Z"
+}

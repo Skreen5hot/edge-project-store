@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://skreen5hot.github.io/edge-project-store/schemas/artifact-record-v1.schema.json",
   "title": "edge-project-store ArtifactRecord, contract version 1",
-  "description": "Shape of <artifact file name>.record.jsonld (EPS R-P4). An input is either an artifact reference {role, path, sha256}, whose path is any relative path (R-B6, R-P4.8) or the source collection {role, collection, members}. Ordering rules (R-P4) and cross-file rules are checked by the contract, not by this schema. Property order is the canonical key order (R-B1).",
+  "description": "Shape of <artifact file name>.record.jsonld (EPS R-P4). An input is either an artifact input {role, relation, path, sha256} or the source collection {role, relation, collection, members}. An artifact input's path is any string here: path safety (R-B6, E-PATH-UNSAFE) and the work-folder rule (E-WORK-INPUT) are contract rules checked after this schema, so they get their own diagnostics. Ordering rules and cross-file rules are checked by the contract. Property order is the canonical key order (R-B1).",
   "type": "object",
   "required": [
     "@context",
@@ -55,7 +55,8 @@
       "$ref": "#/$defs/sha256"
     },
     "bytes": {
-      "type": "integer"
+      "type": "integer",
+      "minimum": 0
     },
     "generation": {
       "enum": [
@@ -99,7 +100,7 @@
     },
     "artifactPath": {
       "type": "string",
-      "pattern": "^(source|normalized|sdd|rml|rdf|graph|diagrams)/[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}\\.[a-z0-9]{1,10}$"
+      "pattern": "^(source|normalized|sdd|rml|rdf|graph|diagrams)/[a-z0-9][a-z0-9-]{0,39}-[0-9]{8}T[0-9]{6}Z-([0-9a-f]{8}|[0-9a-f]{16}|[0-9a-f]{32}|[0-9a-f]{64})\\.[a-z0-9]{1,10}$"
     },
     "producedBy": {
       "type": "object",
@@ -131,6 +132,22 @@
         }
       }
     },
+    "member": {
+      "type": "object",
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/artifactPath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
     "input": {
       "if": {
         "type": "object",
@@ -142,6 +159,7 @@
         "type": "object",
         "required": [
           "role",
+          "relation",
           "collection",
           "members"
         ],
@@ -150,42 +168,47 @@
           "role": {
             "$ref": "#/$defs/role"
           },
+          "relation": {
+            "const": "dependency"
+          },
           "collection": {
             "const": "source"
           },
           "members": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/sha256"
+              "$ref": "#/$defs/member"
             }
           }
         }
       },
       "else": {
-        "$ref": "#/$defs/inputRef"
-      }
-    },
-    "relativePath": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$"
-    },
-    "inputRef": {
-      "type": "object",
-      "required": [
-        "role",
-        "path",
-        "sha256"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "role": {
-          "$ref": "#/$defs/role"
-        },
-        "path": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
+        "type": "object",
+        "required": [
+          "role",
+          "relation",
+          "path",
+          "sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "$ref": "#/$defs/role"
+          },
+          "relation": {
+            "enum": [
+              "dependency",
+              "history"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "sha256": {
+            "$ref": "#/$defs/sha256"
+          }
         }
       }
     }

@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-0d932858.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-0d9328582ac995d690d3225e54697dde4f8767f11e3a159d957bbcab4c3327b7.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "incomplete",
       "heads": [
-        "sdd/revisions/rev-20261101T120001Z-9b972733.jsonld"
+        "sdd/revisions/rev-20261101T120001Z-9b972733d1985a56791c1ffa9b66ec52eefb445f6d980f0375b67435002ea396.jsonld"
       ],
       "current": []
     },
@@ -57,6 +57,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -67,6 +69,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -79,6 +83,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -91,6 +97,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }
@@ -98,7 +106,7 @@
   "diagnostics": [
     {
       "code": "E-MISSING-PARENT",
-      "path": "sdd/revisions/rev-20261101T120001Z-9b972733.jsonld"
+      "path": "sdd/revisions/rev-20261101T120001Z-9b972733d1985a56791c1ffa9b66ec52eefb445f6d980f0375b67435002ea396.jsonld"
     },
     {
       "code": "W-UNCOMMITTED",

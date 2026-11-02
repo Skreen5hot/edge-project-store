@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-a0771992.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-a0771992ad3ecfe7e3bbcdc16fcc1de143903b414e147e0566c89002a664deec.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,8 +24,8 @@
     "sdd": {
       "status": "conflicted",
       "heads": [
-        "sdd/revisions/rev-20261101T120001Z-1eb5fefb.jsonld",
-        "sdd/revisions/rev-20261101T120501Z-eb90dab2.jsonld"
+        "sdd/revisions/rev-20261101T120001Z-1eb5fefb5f076e5072cdab8f3665bb56221e43b118ae85acbd1ac0b888ce491b.jsonld",
+        "sdd/revisions/rev-20261101T120501Z-eb90dab2aca82e3d18b985ac658bdf53dec40d74b2ff9159589b9113630603bb.jsonld"
       ],
       "current": []
     },
@@ -58,6 +58,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -68,6 +70,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -80,6 +84,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -92,6 +98,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -104,6 +112,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

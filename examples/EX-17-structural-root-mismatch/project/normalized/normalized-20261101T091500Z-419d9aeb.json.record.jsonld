@@ -17,6 +17,7 @@
   "inputs": [
     {
       "role": "source",
+      "relation": "dependency",
       "path": "source/schema-20261101T090500Z-51312011.json",
       "sha256": "513120117a1b477b10d66143c278ed129ef7e5d7445029926ce223ee3d90f9cf"
     }

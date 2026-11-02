@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T120001Z-e407946a.jsonld"
+        "normalized/revisions/rev-20261101T120001Z-e407946acac0de10f025d73539fcbe933dc9749f2a2ba1916e84b8bd6431680c.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T120000Z-7b20871f.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T130001Z-c37bfbe2.jsonld"
+        "sdd/revisions/rev-20261101T130001Z-c37bfbe2eb6afd9fbaa3a03d4b28b0225740054563316e5d00fcb1c15e751af5.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T130000Z-7d65e139.jsonld"
@@ -59,6 +59,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -71,6 +73,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -86,6 +90,8 @@
           "input": "normalized/normalized-20261101T091000Z-4c173267.json"
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE",
@@ -99,6 +105,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -109,6 +117,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

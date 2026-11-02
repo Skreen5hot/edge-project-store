@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-c20b2fbe.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-c20b2fbea0c1a8d50ae562ba1a136544559569b00380b0dbce3f4837cac37d08.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-b8761911.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-b87619115492342c543b867a2e9f31a59981a295658b0ad1e456897229142129.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -59,6 +59,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -69,6 +71,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -79,6 +83,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }
@@ -86,7 +92,7 @@
   "diagnostics": [
     {
       "code": "W-FOREIGN-FILE",
-      "path": "sdd/revisions/rev-20261101T100001Z-b8761911-DESKTOP-1.jsonld"
+      "path": "sdd/revisions/rev-20261101T100001Z-b87619115492342c543b867a2e9f31a59981a295658b0ad1e456897229142129-DESKTOP-1.jsonld"
     },
     {
       "code": "W-FOREIGN-FILE",

@@ -15,15 +15,15 @@
     "normalized": {
       "status": "conflicted",
       "heads": [
-        "normalized/revisions/rev-20261101T120001Z-01b0624c.jsonld",
-        "normalized/revisions/rev-20261101T120501Z-229c32ab.jsonld"
+        "normalized/revisions/rev-20261101T120001Z-01b0624c6c2ca1d1ab8e2014be3256e9a5647437f8193db95e82be68ec181b03.jsonld",
+        "normalized/revisions/rev-20261101T120501Z-229c32abe5b9a8994f14fb86bf9020a1062333259bf538a5d30f9c4ac881eaf1.jsonld"
       ],
       "current": []
     },
     "sdd": {
       "status": "out-of-date",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-fbc3d553.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-fbc3d5532165542e4603cd52cc8891b82258e0a69a510a4b7db2c0c4241925ed.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -58,6 +58,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -70,6 +72,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -82,6 +86,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -99,6 +105,8 @@
           "input": "normalized/normalized-20261101T091000Z-4c173267.json"
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE"
@@ -111,6 +119,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

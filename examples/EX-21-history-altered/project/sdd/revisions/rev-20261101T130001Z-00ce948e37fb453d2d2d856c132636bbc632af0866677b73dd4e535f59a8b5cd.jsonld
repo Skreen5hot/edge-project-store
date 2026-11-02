@@ -1,0 +1,23 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@type": "StageRevision",
+  "contractVersion": 1,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000021",
+  "stage": "sdd",
+  "parents": [
+    "a01e8ea43f28a2f0a10f6e268e0db083c87276987671e0b921bbeca436fbc279"
+  ],
+  "current": [
+    {
+      "role": "sdd",
+      "path": "sdd/sdd-20261101T130000Z-7d65e139.jsonld",
+      "sha256": "7d65e139002dc6d0ccee43ac81016a49444891c6891b47089f1584cbe8d43549"
+    }
+  ],
+  "producedBy": {
+    "responsibility": "sdd-author",
+    "tool": "sdd",
+    "version": "1.1.0"
+  },
+  "createdAt": "2026-11-01T13:00:01Z"
+}

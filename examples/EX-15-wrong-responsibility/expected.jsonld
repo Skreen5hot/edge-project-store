@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-6d190019.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-6d190019d69d8109a6c4454d9d2786c778f47a4df58bdb3c843b4559256267dd.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "damaged",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-a3169880.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-a3169880276bfb0d3f93f3f412e6bcda1a6136b22d165c3310ba03f499a47bab.jsonld"
       ],
       "current": []
     },
@@ -57,6 +57,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": true,
       "notReadyBecause": []
     },
@@ -67,6 +69,8 @@
       "inStageCurrent": false,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "NOT-CURRENT"
@@ -79,6 +83,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }
@@ -86,7 +92,7 @@
   "diagnostics": [
     {
       "code": "E-WRONG-RESPONSIBILITY",
-      "path": "sdd/revisions/rev-20261101T120001Z-360d6fb6.jsonld"
+      "path": "sdd/revisions/rev-20261101T120001Z-360d6fb61dafe4c942e52baa1991003de00015793f5c3f5a18dd558b8c641215.jsonld"
     }
   ]
 }

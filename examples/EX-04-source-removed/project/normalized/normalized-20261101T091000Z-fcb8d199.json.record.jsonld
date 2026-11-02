@@ -17,10 +17,17 @@
   "inputs": [
     {
       "role": "sources",
+      "relation": "dependency",
       "collection": "source",
       "members": [
-        "67daa4932a8fed8743a0a85b09b9376d50de79fa72a87d4d5e023d73b0727a41",
-        "9f2b5ce5e7c21816fe07b15446fab5420065b1f7ed8ff819877d1b2254b836f9"
+        {
+          "path": "source/sample-20261101T090500Z-9f2b5ce5.csv",
+          "sha256": "9f2b5ce5e7c21816fe07b15446fab5420065b1f7ed8ff819877d1b2254b836f9"
+        },
+        {
+          "path": "source/schema-20261101T090000Z-67daa493.json",
+          "sha256": "67daa4932a8fed8743a0a85b09b9376d50de79fa72a87d4d5e023d73b0727a41"
+        }
       ]
     }
   ],

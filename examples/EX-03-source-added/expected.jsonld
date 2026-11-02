@@ -16,7 +16,7 @@
     "normalized": {
       "status": "out-of-date",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-faecb7fb.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-faecb7fb2de12bcf71195191f03cd9429c1322bfb733d4362f079e9324543cce.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -25,7 +25,7 @@
     "sdd": {
       "status": "out-of-date",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-2f00f0c9.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-2f00f0c9d73d69694d0b16ab7b9668965e281c6bd29b68947b7fda5ac395ec3c.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -64,11 +64,16 @@
           "code": "SOURCE-CHANGED",
           "input": "source",
           "added": [
-            "d7240c3d60e48a6cc61f9bc04f8f7ed2f1dab66928751822385f8fbf2d20a557"
+            {
+              "path": "source/schema-20261101T110000Z-d7240c3d.json",
+              "sha256": "d7240c3d60e48a6cc61f9bc04f8f7ed2f1dab66928751822385f8fbf2d20a557"
+            }
           ],
           "removed": []
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE"
@@ -86,6 +91,8 @@
           "input": "normalized/normalized-20261101T091000Z-4c173267.json"
         }
       ],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": false,
       "notReadyBecause": [
         "OUT-OF-DATE"
@@ -98,6 +105,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     },
@@ -108,6 +117,8 @@
       "inStageCurrent": true,
       "upToDate": true,
       "staleBecause": [],
+      "historyVerified": true,
+      "historyBecause": [],
       "pipelineReady": null,
       "notReadyBecause": []
     }

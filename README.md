@@ -3,7 +3,7 @@
 A shared project folder for offline, edge-canonical data pipelines, and one small module that every tool in the
 pipeline reuses to read and write it.
 
-**Status:** contract v0.1 **draft** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 19 synthetic
+**Status:** contract v0.1 **draft** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 25 synthetic
 example projects with their expected evaluation reports. No module code yet. See [`PROPOSAL.md`](PROPOSAL.md) for
 the plan and the decisions behind it.
 
@@ -15,7 +15,8 @@ use one **project folder** with a fixed layout:
 
 - the user picks the folder (it can live in OneDrive, a network share or a git repository);
 - each stage has its own subfolder with one responsible writer; `source/` is a shared intake area;
-- nothing is ever overwritten: artifacts, their records and the stage's revisions are only ever added;
+- committed state is never overwritten: artifacts, their records and the stage's revisions are only ever added
+  (work in progress is the one mutable exception);
 - every artifact has a record of the exact inputs it was built from, so any tool can tell, recursively, what is
   out of date and why;
 - the normalized schema is the structural source of truth: later artifacts are pipeline-ready only when they trace

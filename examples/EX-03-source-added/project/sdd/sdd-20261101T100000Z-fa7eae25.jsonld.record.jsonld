@@ -17,6 +17,7 @@
   "inputs": [
     {
       "role": "structure",
+      "relation": "dependency",
       "path": "normalized/normalized-20261101T091000Z-4c173267.json",
       "sha256": "4c173267a5cb85aa5b8b4aa74123b78b7d874cea12df85c936a506a500b8b206"
     }

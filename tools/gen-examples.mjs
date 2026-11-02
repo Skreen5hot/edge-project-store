@@ -48,12 +48,13 @@ class Project {
   put(path, bytes) { this.files.set(path, typeof bytes === 'string' ? enc.encode(bytes) : bytes); }
   remove(path) { if (!this.files.delete(path)) throw new Error(`no such file: ${path}`); }
 
-  /** An artifact and its record (R-B3, R-P4). `by` names a producer in BY; `stage` defaults to its own. */
-  artifact(by, kind, ext, hhmmss, content, { inputs = [], stage = STAGE_OF[by], generation } = {}) {
+  /** An artifact and its record (R-B3, R-P4). `by` names a producer in BY; `stage` defaults to its own;
+   *  `prefix` is the hash-prefix length in the name (8 unless a collision forced a longer one, R-W1). */
+  artifact(by, kind, ext, hhmmss, content, { inputs = [], stage = STAGE_OF[by], generation, prefix = 8 } = {}) {
     const t = time(hhmmss);
     const bytes = enc.encode(content);
     const hash = sha256(bytes);
-    const path = `${stage}/${kind}-${t.name}-${hash.slice(0, 8)}.${ext}`;
+    const path = `${stage}/${kind}-${t.name}-${hash.slice(0, prefix)}.${ext}`;
     this.put(path, bytes);
     this.put(`${path}.record.jsonld`, canonical({
       '@context': CTX, '@type': 'ArtifactRecord', contractVersion: 1, project: this.id, stage, path, kind,
@@ -70,20 +71,40 @@ class Project {
     const bytes = canonical({
       '@context': CTX, '@type': 'StageRevision', contractVersion: 1, project: this.id, stage,
       parents: parents.map((r) => r.sha256).sort(),
-      current: current.map(([role, a]) => ({ role, path: a.path, sha256: a.sha256 }))
+      current: current.map(([role, a]) => ({ role, path: a.path, sha256: a.sha256 })) // entries cite the full hash
         .sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0)),
       producedBy: BY[by], createdAt: t.at,
     });
     const hash = sha256(bytes);
-    const path = `${stage}/revisions/rev-${t.name}-${hash.slice(0, 8)}.jsonld`;
+    const path = `${stage}/revisions/rev-${t.name}-${hash}.jsonld`; // R-B4: full SHA-256
     this.put(path, bytes);
     return { path, sha256: hash };
   }
 }
 
-// Input references for records.
-const use = (role, a) => ({ role, path: a.path, sha256: a.sha256 });
-const sources = (...members) => ({ role: 'sources', collection: 'source', members: members.map((m) => m.sha256).sort() });
+/** Where an artifact will be written, without writing it (for records that cite each other, EX-24). */
+function planned(stage, kind, ext, hhmmss, content) {
+  const hash = sha256(enc.encode(content));
+  return { path: `${stage}/${kind}-${time(hhmmss).name}-${hash.slice(0, 8)}.${ext}`, sha256: hash };
+}
+
+/** Two different contents whose SHA-256 values share their first 8 hex characters (EX-25). A birthday search:
+ *  deterministic, so the examples stay byte-reproducible. */
+function prefixCollision(a, b) {
+  const seen = new Map();
+  for (let i = 0; i < 1 << 17; i++) seen.set(sha256(enc.encode(a(i))).slice(0, 8), i);
+  for (let j = 0; ; j++) {
+    const i = seen.get(sha256(enc.encode(b(j))).slice(0, 8));
+    if (i !== undefined) return [a(i), b(j)];
+  }
+}
+
+// Input references for records (R-P4): every input declares its relation.
+const byPath = (x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0);
+const member = (a) => ({ path: a.path, sha256: a.sha256 });
+const use = (role, a) => ({ role, relation: 'dependency', path: a.path, sha256: a.sha256 });
+const hist = (role, a) => ({ role, relation: 'history', path: a.path, sha256: a.sha256 });
+const sources = (...members) => ({ role: 'sources', relation: 'dependency', collection: 'source', members: members.map(member).sort(byPath) });
 
 // Report builders: formatting only. Every verdict is passed in literally.
 function report(p, { stages = {}, artifacts = [], diagnostics = [] } = {}) {
@@ -98,10 +119,10 @@ function report(p, { stages = {}, artifacts = [], diagnostics = [] } = {}) {
 const stage = (status, heads = [], current = []) => ({
   status, heads: heads.map((r) => r.path).sort(), current: current.map((a) => a.path).sort(),
 });
-function art(a, { cur, up = true, stale = [], ready, notReady = [] }) {
+function art(a, { cur, up = true, stale = [], histOk = true, histWhy = [], ready, notReady = [] }) {
   return {
     path: a.path, sha256: a.sha256, stage: a.path.split('/')[0], inStageCurrent: cur, upToDate: up,
-    staleBecause: stale, pipelineReady: ready, notReadyBecause: notReady,
+    staleBecause: stale, historyVerified: histOk, historyBecause: histWhy, pipelineReady: ready, notReadyBecause: notReady,
   };
 }
 const src = (a) => art(a, { cur: true, ready: null });
@@ -138,13 +159,13 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1, s2]), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1), src(s2),
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [s2.sha256], removed: [] })], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [member(s2)], removed: [] })], ready: false, notReady: ['OUT-OF-DATE'] }),
         art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
       ],
     });
   }],
 
-  ['04-source-removed', 'A source file (and its record) deleted after normalization.', 'R-W7, R-E6 (SOURCE-CHANGED)', (p) => {
+  ['04-source-removed', 'A person deletes a source file and its record after normalization (an external mutation; writers never delete).', 'R-W10, R-E6 (SOURCE-CHANGED)', (p) => {
     const s1 = p.artifact('intake', 'schema', 'json', '090000', '{"objectTypes":["Organization","Site"]}\n');
     const s2 = p.artifact('intake', 'sample', 'csv', '090500', 'Name,Site\nAcme,North\n');
     const n1 = p.artifact('normalizer', 'normalized', 'json', '091000', '{"normalized":1,"types":["Organization","Site"],"samples":1}\n', { inputs: [sources(s1, s2)] });
@@ -156,19 +177,19 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [s2.sha256] })], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s2)] })], ready: false, notReady: ['OUT-OF-DATE'] }),
         art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
       ],
     });
   }],
 
-  ['05-source-altered', 'A source file edited in place: an integrity error, and it is no longer a member.', 'R-E3 (E-INTEGRITY), R-E4, R-E6', (p) => {
+  ['05-source-altered', 'A person edits a source file in place (an external mutation): an integrity error, and it is no longer a member.', 'R-W10, R-E3 (E-INTEGRITY), R-E4, R-E6', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     p.put(s1.path, '{"objectTypes":["Organization","Site","Edited"]}\n');
     return report(p, {
       stages: { source: stage('empty'), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [s1.sha256] })], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s1)] })], ready: false, notReady: ['OUT-OF-DATE'] }),
         art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
       ],
       diagnostics: [diag('E-INTEGRITY', s1)],
@@ -202,9 +223,9 @@ const EXAMPLES = [
 
   ['08-stage-conflict', 'Two revisions written from the same head (for example on two synchronized PCs).', 'R-E5.4, R-E5.6 (E-STAGE-CONFLICT), §9', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
-    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2,"by":"pc-a"}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2,"by":"pc-a"}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     const rA = p.revision('sdd', '120001', [rD1], [['sdd', d2]]);
-    const d3 = p.artifact('sdd', 'sdd', 'jsonld', '120500', '{"sdd":2,"by":"pc-b"}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d3 = p.artifact('sdd', 'sdd', 'jsonld', '120500', '{"sdd":2,"by":"pc-b"}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     const rB = p.revision('sdd', '120501', [rD1], [['sdd', d3]]);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('conflicted', [rA, rB]) },
@@ -220,9 +241,9 @@ const EXAMPLES = [
 
   ['09-conflict-merged', 'The conflict of EX-08 resolved by a merge revision naming both heads.', 'R-W3', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
-    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2,"by":"pc-a"}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2,"by":"pc-a"}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     const rA = p.revision('sdd', '120001', [rD1], [['sdd', d2]]);
-    const d3 = p.artifact('sdd', 'sdd', 'jsonld', '120500', '{"sdd":2,"by":"pc-b"}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d3 = p.artifact('sdd', 'sdd', 'jsonld', '120500', '{"sdd":2,"by":"pc-b"}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     const rB = p.revision('sdd', '120501', [rD1], [['sdd', d3]]);
     const rM = p.revision('sdd', '130000', [rA, rB], [['sdd', d3]]);
     return report(p, {
@@ -238,7 +259,7 @@ const EXAMPLES = [
 
   ['10-interrupted-commit', 'Leftovers of interrupted writes: a temporary file, an uncommitted artifact and a truncated revision. What is current does not change.', '§10, R-E2 (W-TEMP-FILE), R-E5.1 (W-INTERRUPTED-REVISION), R-E5.9 (W-UNCOMMITTED)', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
-    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     p.put('sdd/.eps-tmp-7d3f0a', '{"sdd":3');
     // The revision the writer meant to create, cut off mid-write. Its name carries the intended file's hash.
     const intended = p.revision('sdd', '120001', [rD1], [['sdd', d2]]);
@@ -254,7 +275,7 @@ const EXAMPLES = [
     });
   }],
 
-  ['11-damaged-head', 'The current SDD edited in place: integrity error, and the stage is damaged.', 'R-E3 (E-INTEGRITY), R-E5.5 (E-CURRENT-UNRESOLVED)', (p) => {
+  ['11-damaged-head', 'A person edits the current SDD in place (an external mutation): integrity error, and the stage is damaged.', 'R-E3 (E-INTEGRITY), R-E5.5 (E-CURRENT-UNRESOLVED)', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     p.put(d1.path, '{"sdd":1,"structure":"normalized-1","edited":true}\n');
     return report(p, {
@@ -266,7 +287,7 @@ const EXAMPLES = [
 
   ['12-missing-parent', 'A revision whose parent has not arrived (sync lag) or was deleted: the stage is incomplete.', 'R-E5.3 (E-MISSING-PARENT), R-E5.9', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
-    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2}\n', { inputs: [use('previous', d1), use('structure', n1)] });
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '120000', '{"sdd":2}\n', { inputs: [hist('previous', d1), use('structure', n1)] });
     const rD2 = p.revision('sdd', '120001', [rD1], [['sdd', d2]]);
     p.remove(rD1.path);
     return report(p, {
@@ -316,11 +337,11 @@ const EXAMPLES = [
     });
   }],
 
-  ['16-work-input', 'A diagram whose record cites a work-in-progress file: the record is invalid.', 'R-P4.8 (E-WORK-INPUT), R-P6', (p) => {
+  ['16-work-input', 'A diagram whose record cites a work-in-progress file: the record is invalid.', 'R-P4.9 (E-WORK-INPUT), R-P6', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     p.put('sdd/work/session.json', '{"open":["Site"]}\n');
     const g1 = p.artifact('diagrams', 'diagram', 'mmd', '110000', 'classDiagram\n  Organization --> Site\n',
-      { inputs: [use('model', d1), { role: 'notes', path: 'sdd/work/session.json', sha256: sha256(p.files.get('sdd/work/session.json')) }] });
+      { inputs: [use('model', d1), { role: 'notes', relation: 'dependency', path: 'sdd/work/session.json', sha256: sha256(p.files.get('sdd/work/session.json')) }] });
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
       artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
@@ -367,11 +388,11 @@ const EXAMPLES = [
     });
   }],
 
-  ['19-sdd-rerun', 'An SDD rerun on a new normalized schema, citing the previous SDD as history: the new SDD is ready.', 'R-E6 (same-stage input), R-E7', (p) => {
+  ['19-sdd-rerun', 'An SDD rerun on a new normalized schema, citing the previous SDD as history: the new SDD is ready.', 'R-P4 (relation: history), R-E7, R-E9', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
     const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
-    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '130000', '{"sdd":2,"structure":"normalized-2"}\n', { inputs: [use('previous', d1), use('structure', n2)] });
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '130000', '{"sdd":2,"structure":"normalized-2"}\n', { inputs: [hist('previous', d1), use('structure', n2)] });
     const rD2 = p.revision('sdd', '130001', [rD1], [['sdd', d2]]);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('ok', [rD2], [d2]) },
@@ -382,6 +403,118 @@ const EXAMPLES = [
         art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)], ready: false, notReady: ['OUT-OF-DATE', 'NOT-CURRENT'] }),
         art(d2, { cur: true, ready: true }),
       ],
+    });
+  }],
+
+  ['20-same-stage-dependency', 'The same rerun as EX-19, but the new SDD declares the previous SDD a dependency: staleness and the old structural root follow it.', 'R-P4 (relation: dependency), R-E6, R-E7 (STRUCTURAL-ROOT-MISMATCH)', (p) => {
+    const { s1, n1, rN1, d1, rD1 } = chain(p);
+    const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
+    const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '130000', '{"sdd":2,"reused":"sdd-1"}\n', { inputs: [use('reused', d1), use('structure', n2)] });
+    const rD2 = p.revision('sdd', '130001', [rD1], [['sdd', d2]]);
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('out-of-date', [rD2], [d2]) },
+      artifacts: [
+        src(s1),
+        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        art(n2, { cur: true, ready: true }),
+        art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)], ready: false, notReady: ['OUT-OF-DATE', 'NOT-CURRENT'] }),
+        art(d2, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', d1)], ready: false, notReady: ['OUT-OF-DATE', 'STRUCTURAL-ROOT-MISMATCH'] }),
+      ],
+    });
+  }],
+
+  ['21-history-altered', 'EX-19, then the previous SDD is edited in place: its integrity fails and the new SDD\'s history is unverified (but it stays up to date).', 'R-E3 (E-INTEGRITY), R-E9 (HISTORY-ALTERED)', (p) => {
+    const { s1, n1, rN1, d1, rD1 } = chain(p);
+    const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
+    const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
+    const d2 = p.artifact('sdd', 'sdd', 'jsonld', '130000', '{"sdd":2,"structure":"normalized-2"}\n', { inputs: [hist('previous', d1), use('structure', n2)] });
+    const rD2 = p.revision('sdd', '130001', [rD1], [['sdd', d2]]);
+    p.put(d1.path, '{"sdd":1,"structure":"normalized-1","edited":true}\n');
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('ok', [rD2], [d2]) },
+      artifacts: [
+        src(s1),
+        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        art(n2, { cur: true, ready: true }),
+        art(d2, { cur: true, histOk: false, histWhy: [why('HISTORY-ALTERED', d1)], ready: true }),
+      ],
+      diagnostics: [diag('E-INTEGRITY', d1)],
+    });
+  }],
+
+  ['22-extended-name', 'A source file whose 8-character name was taken by a different file, so its name carries a 16-character hash prefix.', 'R-B3, R-W1', (p) => {
+    const s1 = p.artifact('intake', 'schema', 'json', '090000', '{"objectTypes":["Organization","Site"]}\n', { prefix: 16 });
+    const stray = `source/schema-20261101T090000Z-${s1.sha256.slice(0, 8)}.json`;
+    p.put(stray, '{"objectTypes":["Not","The","Same"]}\n');
+    const n1 = p.artifact('normalizer', 'normalized', 'json', '091000', '{"normalized":1,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
+    const rN1 = p.revision('normalizer', '091001', [], [['normalized', n1]]);
+    const d1 = p.artifact('sdd', 'sdd', 'jsonld', '100000', '{"sdd":1,"structure":"normalized-1"}\n', { inputs: [use('structure', n1)] });
+    const rD1 = p.revision('sdd', '100001', [], [['sdd', d1]]);
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
+      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      diagnostics: [diag('W-UNREGISTERED', stray)],
+    });
+  }],
+
+  ['23-unsafe-input-paths', 'Records citing inputs by traversal, a drive letter, a backslash and a case variant: each record is refused before any file is opened.', 'R-B6, R-P4.8 (E-PATH-UNSAFE)', (p) => {
+    const { s1, n1, rN1, d1, rD1 } = chain(p);
+    const name = d1.path.split('/')[1];
+    const unsafe = ['../outside/schema.json', 'C:/data/schema.json', `sdd\\${name}`, `SDD/${name}`];
+    const bad = unsafe.map((path, i) => p.artifact('diagrams', 'diagram', 'mmd', `11${i}000`, `classDiagram\n  %% unsafe ${i}\n`,
+      { inputs: [{ role: 'model', relation: 'dependency', path, sha256: d1.sha256 }] }));
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
+      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      diagnostics: bad.map((g) => diag('E-PATH-UNSAFE', g.record)),
+    });
+  }],
+
+  ['24-dependency-cycle', 'Two diagrams depend on each other, and a third depends on one of them: CYCLE on the cycle, UPSTREAM-OUT-OF-DATE outside it.', 'R-E6 (cycles), R-E7', (p) => {
+    const { s1, n1, rN1, d1, rD1 } = chain(p);
+    const c1 = 'classDiagram\n  %% g1\n', c2 = 'classDiagram\n  %% g2\n';
+    const g1ref = planned('diagrams', 'diagram', 'mmd', '110000', c1);
+    const g2ref = planned('diagrams', 'diagram', 'mmd', '110500', c2);
+    const g1 = p.artifact('diagrams', 'diagram', 'mmd', '110000', c1, { inputs: [use('model', d1), use('peer', g2ref)] });
+    const g2 = p.artifact('diagrams', 'diagram', 'mmd', '110500', c2, { inputs: [use('peer', g1ref)] });
+    const g3 = p.artifact('diagrams', 'diagram', 'mmd', '111000', 'classDiagram\n  %% g3\n', { inputs: [use('view', g1)] });
+    const rG = p.revision('diagrams', '112000', [], [['diagram', g1], ['diagram', g2], ['diagram', g3]]);
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]), diagrams: stage('out-of-date', [rG], [g1, g2, g3]) },
+      artifacts: [
+        src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true }),
+        art(g1, { cur: true, up: false, stale: [why('CYCLE', g2)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(g2, { cur: true, up: false, stale: [why('CYCLE', g1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(g3, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', g1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+      ],
+    });
+  }],
+
+  ['25-sync-name-collision', 'Two disconnected PCs give different SDDs the same name (same second, same 8-character prefix). After sync, one file holds the name and the other is a conflict copy; both full-hash revisions arrive, so the collision is detected as a conflict.', '§9, R-B3, R-B4, R-E5.6', (p) => {
+    const { s1, n1, rN1, d1, rD1 } = chain(p);
+    const [contentA, contentB] = prefixCollision(
+      (i) => `{"sdd":2,"by":"pc-a","n":${i}}\n`, (j) => `{"sdd":2,"by":"pc-b","n":${j}}\n`);
+    const opts = { inputs: [hist('previous', d1), use('structure', n1)] };
+    const dA = p.artifact('sdd', 'sdd', 'jsonld', '120000', contentA, opts);
+    // PC B's artifact and record, built in a scratch copy of the project, then renamed by the sync client.
+    const q = new Project(25);
+    const dB = q.artifact('sdd', 'sdd', 'jsonld', '120000', contentB, opts);
+    if (dB.path !== dA.path || dB.sha256 === dA.sha256) throw new Error('EX-25 needs a real prefix collision');
+    const copyArtifact = dA.path.replace(/\.jsonld$/, '-DESKTOP-B.jsonld');
+    const copyRecord = `${dA.path}.record-DESKTOP-B.jsonld`;
+    p.put(copyArtifact, q.files.get(dB.path));
+    p.put(copyRecord, q.files.get(dB.record));
+    const rA = p.revision('sdd', '120001', [rD1], [['sdd', dA]]);
+    const rB = p.revision('sdd', '120002', [rD1], [['sdd', dB]]);
+    return report(p, {
+      stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('conflicted', [rA, rB]) },
+      artifacts: [
+        src(s1), art(n1, { cur: true, ready: true }),
+        art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        art(dA, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+      ],
+      diagnostics: [diag('E-STAGE-CONFLICT', 'sdd'), diag('W-FOREIGN-FILE', copyArtifact), diag('W-FOREIGN-FILE', copyRecord)],
     });
   }],
 ];
