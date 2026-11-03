@@ -3,8 +3,8 @@
 A shared project folder for offline, edge-canonical data pipelines, and one small module that every tool in the
 pipeline reuses to read and write it.
 
-**Status:** contract v0.1 **draft** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 25 synthetic
-example projects with their expected evaluation reports. No module code yet. See [`PROPOSAL.md`](PROPOSAL.md) for
+**Status:** contract v0.1 **frozen** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 25
+synthetic example projects with their expected evaluation reports. The module (slice 2) is in progress. See [`PROPOSAL.md`](PROPOSAL.md) for
 the plan and the decisions behind it.
 
 ## The idea
@@ -29,7 +29,7 @@ report of what is current, out of date, in conflict or damaged.
 
 | Path | What |
 |---|---|
-| [`spec/edge-project-contract.md`](spec/edge-project-contract.md) | The contract (EPS v0.1 draft) |
+| [`spec/edge-project-contract.md`](spec/edge-project-contract.md) | The contract (EPS v0.1, frozen) |
 | [`context/eps-v1.jsonld`](context/eps-v1.jsonld) | The JSON-LD context, bundled by every tool and never fetched |
 | [`schemas/`](schemas/) | JSON Schemas for the project file, artifact records, stage revisions and the evaluation report |
 | [`examples/`](examples/) | Synthetic project folders, each with the report a conforming reader must produce |

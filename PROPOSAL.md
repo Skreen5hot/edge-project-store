@@ -1,7 +1,7 @@
 # edge-project-store: proposal
 
-**Status:** direction approved by the registrar (2026-11-02). Contract v0.1 is a **draft, not frozen**. This
-revision answers the registrar's review of the first draft. Nothing is published.
+**Status:** architecture approved by the registrar. Contract v0.1 is **frozen** (2026-11-03) and slice 2 is
+authorized. Nothing is published; publication is a separate decision.
 
 ## 1. Problem
 
@@ -131,8 +131,8 @@ and which time it records) are settled in the SDD tool's own proposal.
 
 | # | Slice | Delivers | Status |
 |---|---|---|---|
-| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | **draft, for review** |
-| 2 | Contract module + memory backend | The pure evaluation and project API, judged against the examples | after review of slice 1 |
+| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | **frozen** (2026-11-03) |
+| 2 | Contract module + memory backend | The pure evaluation and project API. The 25 expected reports are its conformance tests, and independent unit tests cover operations and edge cases the fixtures do not; passing the examples is not taken as exhaustive correctness | **authorized**, in progress |
 | 3 | Node and browser backends | `node:fs` and File System Access backends, browser session handling, cloud-folder verification (§11) | |
 | 4 | SDD project mode (SDD v1.1) | The SDD tool vendors the module: project folder, resume, Reopen; CLI `--project <dir>` | |
 | later | Other stages | Normalizer, RML generator, RDF, graph loader and diagram exporter adopt the module as they are built | |
@@ -156,9 +156,9 @@ renaming a project (v0.1).
 | D7 | `diagrams/` is owned by the `diagram-exporter` responsibility, which may run inside another tool. | **approved** (EPS §3) |
 | D8 | MIT licence; the adapted mermaid code is CC0. | proposed |
 | D9 | Every input declares `dependency` or `history`; history is verified for identity and integrity but does not affect freshness or structural roots; same-stage inputs are not automatically history; a same-stage dependency is exempt only from "superseded". | **approved** (independent review) |
-| D10 | The repository stays local until the revised contract and slice 1 are reviewed. | **registrar** |
+| D10 | The repository stays local and unpublished until a separate publication decision. | **registrar** |
 | D11 | Unverified history (`historyVerified: false`) is reported but does not block `pipelineReady`, which means structural readiness only. | **approved** (independent review) |
 | D12 | Input paths: the schema accepts any string; the contract's safe-path rule refuses unsafe ones (E-PATH-UNSAFE) before the work-folder rule. | **approved with constraints** (second review), constraints applied |
-| D13 | Writers never delete or modify committed files; people's changes are external mutations that the evaluation reports; no retirement operation in v0.1. | proposed (finding 1) |
-| D14 | Backends declare a write guarantee level, *exclusive* or *checked*; exclusive is mandatory where available. | proposed (finding 2) |
-| D15 | Revision names carry the full SHA-256; artifact names keep the short prefix, with cross-machine collisions detected and recoverable. | proposed (finding 3) |
+| D13 | Writers never delete or modify committed files; people's changes are external mutations that the evaluation reports; no retirement operation in v0.1. | **approved** (final review) |
+| D14 | Backends declare a write guarantee level, *exclusive* or *checked*; exclusive is mandatory where available. | **approved** (final review) |
+| D15 | Revision names carry the full SHA-256; artifact names keep the short prefix, with cross-machine collisions detected and recoverable. | **approved** (final review) |

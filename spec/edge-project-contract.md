@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.1 **draft**, not frozen (2026-11-02). Slice 1 of [`../PROPOSAL.md`](../PROPOSAL.md). |
+| **Status** | v0.1 **frozen** (2026-11-03), after the registrar's final confirmation review. Slice 1 of [`../PROPOSAL.md`](../PROPOSAL.md). Any change to the rules, schemas or expected reports is a new contract version. |
 | **Registrar** | Aaron Damiano. |
 | **Normative language** | BCP 14 keywords (MUST, MUST NOT, SHOULD, MAY) per RFC 2119 / RFC 8174, uppercase only. |
 | **Identifiers** | Rules R-B\* (bytes and names), R-P\* (project files), R-E\* (evaluation), R-W\* (writers); diagnostics E-\* (errors) and W-\* (warnings); examples EX-\*. Minted, never renumbered. |
