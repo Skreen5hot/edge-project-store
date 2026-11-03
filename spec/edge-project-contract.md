@@ -6,7 +6,7 @@
 | **Registrar** | Aaron Damiano. |
 | **Normative language** | BCP 14 keywords (MUST, MUST NOT, SHOULD, MAY) per RFC 2119 / RFC 8174, uppercase only. |
 | **Identifiers** | Rules R-B\* (bytes and names), R-P\* (project files), R-E\* (evaluation), R-W\* (writers); diagnostics E-\* (errors) and W-\* (warnings); examples EX-\*. Minted, never renumbered. |
-| **Conformance** | A **reader** conforms when its evaluation (§7) of every example under [`../examples/`](../examples/) equals that example's `expected.jsonld` byte for byte. A **writer** conforms when it follows §8 and every project it writes evaluates without errors. |
+| **Conformance** | A **reader** conforms when its evaluation (§7) of every example under [`../examples/`](../examples/) equals that example's `expected.jsonld` byte for byte. A **writer** conforms when it follows §8 and no commit it completes introduces an evaluation error. Interrupted operations leave the recognized states of §10 and are recovered under those rules; external mutations (R-W10) are not writer operations. |
 
 **What this is, in one paragraph.** A pipeline of offline tools (source schema or sample data → normalized schema
 → Semantic Data Dictionary → RML → RDF → graph, with Mermaid diagrams as a derived view) shares work through one
@@ -281,19 +281,25 @@ pure: identical folders give identical reports.
   which may belong to another writer's commit in progress. How strictly a backend can enforce this is its
   guarantee level (R-W9).
   - **Artifact names.** The writer tries the 8-character hash prefix first. If the name holds **different** bytes
-    (a prefix collision or a stray file), it tries the 16-, 32- and 64-character prefixes in turn (R-B3, EX-22).
+    (a prefix collision, a stray file or a partial write), it tries the 16-, 32- and 64-character prefixes in turn
+    (R-B3, EX-22).
   - **Same bytes already present.** If the name holds identical bytes and the record beside it is byte-identical to
     the record the writer would write, the write already happened (a retry) and succeeds. If the record is absent,
     the writer creates it, completing an interrupted write.
-  - **Same bytes, different provenance.** If the name holds identical bytes but the existing record differs from
-    the one the writer would write (another tool or configuration produced the same content in the same second),
-    the writer MUST NOT reuse that artifact or touch its record. It uses a later `createdAt`, which gives a new name
-    and a record of its own.
+  - **Same bytes, different record.** If the name holds identical bytes but the existing record differs from the
+    one the writer would write (another tool or configuration produced the same content in the same second, or the
+    record is damaged), the writer MUST NOT reuse that artifact or touch its record. A record's name follows from
+    its artifact's name (R-P4), so a new record needs a new artifact: the writer takes a later `createdAt` and
+    writes the artifact again under the resulting name, with its own record.
+  - **Prefixes exhausted.** If all four names at one `createdAt` hold different bytes (for example, a partial
+    artifact under the 64-character name after the shorter names were taken), the writer takes a later `createdAt`
+    and starts again at the 8-character prefix.
   - **Revisions** carry their full SHA-256 in the name (R-B4). If the name holds identical bytes, the write
     succeeds. If it holds different bytes, which only an interrupted or damaged write can leave, the writer uses a
     later `createdAt`, giving a new name.
-  - If no name is usable, the writer stops with **E-NAME-TAKEN** and changes nothing. Only a file that breaks this
-    contract can cause this.
+  - A later `createdAt` is at least one second after the one tried, so that it changes the name. A writer that
+    cannot use a later `createdAt` (for example, because its caller fixed the time) stops with **E-NAME-TAKEN** and
+    changes nothing. In every case the files already present are left untouched.
 - **R-W2: Commit order.** To publish artifacts in a stage it owns, a writer creates (1) each artifact, (2) its
   record, then (3) one revision listing them. The revision is the **commit point**: until it exists, the new
   artifacts are uncommitted (W-UNCOMMITTED) and the stage is unchanged.
@@ -370,7 +376,7 @@ committed files (R-W1). Removing leftovers is something a person may choose to d
 | artifact, before record | artifact without record | W-UNREGISTERED | retry: the same bytes are found and the record is created (R-W1) | delete the artifact |
 | record, before revision | registered, uncommitted artifact | W-UNCOMMITTED; stage unchanged | retry the commit: artifact and record are found, then the revision is written | delete both files |
 | partial revision | unparseable revision | W-INTERRUPTED-REVISION; stage unchanged | retry: the name holds different bytes, so R-W1 gives the revision a later `createdAt` and it is written beside the partial one | delete the partial file |
-| partial artifact or record under its final name (only where content writes are not atomic, §11) | bytes that do not match | E-INTEGRITY or E-RECORD-INVALID | write again: R-W1 chooses a new name (a longer prefix for the artifact, a later `createdAt` for a record); if the damaged artifact is in a head, write a repair revision (R-W4) | delete the damaged files |
+| partial artifact or record under its final name (only where content writes are not atomic, §11) | bytes that do not match | E-INTEGRITY or E-RECORD-INVALID | write again, leaving the damaged files untouched. A partial artifact: R-W1 tries the longer prefixes, then a later `createdAt` if all four are taken. A damaged record: its name is fixed by its artifact's, so R-W1 writes the artifact again under a later `createdAt`, with a new record. If the damaged artifact is in a head, write a repair revision (R-W4) | delete the damaged files |
 | revision cites a parent not (yet) present | stage `incomplete` | E-MISSING-PARENT | none: writes are refused (R-W4) | wait for synchronization, or restore the parent |
 | artifact name taken on another machine (found after synchronization) | a sync-conflict copy; stage conflicted | W-FOREIGN-FILE, E-STAGE-CONFLICT (EX-25) | write the artifact again under a longer prefix and its own record; then a merge revision once a person has chosen (R-W3) | delete the conflict copy |
 

@@ -40,11 +40,11 @@ The tools share a **folder contract**, not a server, a database or a common appl
 | Review point | Resolution | Where |
 |---|---|---|
 | Edge JSON-LD with a versioned local context | All metadata files and the evaluation report are JSON-LD with `@context` = the bundled `eps-v1.jsonld` IRI, never dereferenced; any other context is refused (E-CTX-EXTERNAL); a new context version is a new IRI. JSON Schemas give the shapes. | EPS R-P1; `context/`, `schemas/`; EX-13 |
-| Recursive out-of-date detection, including source membership | Staleness follows inputs recursively (UPSTREAM-OUT-OF-DATE). A normalizer cites the **source collection** with its member hashes, so adding, removing or editing a source file is detected (SOURCE-CHANGED with `added` and `removed`). | EPS R-E4, R-E6; EX-03, EX-04, EX-05 |
-| The concurrency claim | Corrected. Rereading before writing only narrows the window on one machine. Across synchronized machines nothing is prevented. Instead, because no file is ever modified and names are content-derived, sync never has to merge a file, and a fork shows up as two heads (**conflicted**), never as a silently lost update. | EPS §9, R-W5; EX-08, EX-14 |
+| Recursive out-of-date detection, including source membership | Staleness follows inputs recursively (UPSTREAM-OUT-OF-DATE). A normalizer cites the **source collection** as `{path, sha256}` member pairs, so adding, removing, renaming or editing a source file is detected (SOURCE-CHANGED with `added` and `removed`). | EPS R-E4, R-E6; EX-03, EX-04, EX-05 |
+| The concurrency claim | Corrected. Rereading before writing only narrows the window on one machine. Across synchronized machines nothing is prevented. Instead, no committed file is ever modified, and revision names carry the full SHA-256, so two different revisions never share a name and a fork shows up as two heads (**conflicted**), never as a silently lost update. Artifact names use a short prefix, so two machines can give different artifacts the same name; sync then keeps one and makes a conflict copy, and this is detected (both revisions arrive and conflict) and recoverable, not prevented. | EPS §9, R-B4, R-W5; EX-08, EX-14, EX-25 |
 | Recovery from interrupted writes and conflicting revisions | Defined commit order (artifact, record, then revision as the commit point), a table of every interrupted state with its diagnostic and recovery, merge revisions for conflicts, repair revisions for damaged heads, and a refusal to write on damage. | EPS R-W2–R-W4, §10; EX-09–EX-12, EX-15 |
 | Integrity vs provenance vs deterministic generation | Separated: integrity and input consistency are **checked**; provenance completeness and deterministic generation are **declared** (`generation`: `received`, `deterministic`, `assisted`); authenticity is not provided. | EPS §12 |
-| Actual atomic-write guarantees | Documented per backend (Node: temp file, `fsync`, `link()` as an atomic create-if-absent, with a `rename()` fallback; browser: temp file and `move()`, with a direct-write fallback that relies on Chromium behaviour). Correctness never depends on atomicity, because every file is checked against a hash. Cloud-folder behaviour is to be verified in slice 3. | EPS §11 |
+| Actual atomic-write guarantees | Documented per backend, each with a declared guarantee level (R-W9). Node is **exclusive**: temp file, `fsync`, `link()` as an atomic create-if-absent, with an exclusive-create (`wx`) fallback; `rename()` onto a final name is forbidden. The browser is **checked**: check the name, temp file, `move()`, with a direct-write fallback that relies on Chromium behaviour. Correctness never depends on atomicity, because every file is checked against a hash. Cloud-folder behaviour is to be verified in slice 3. | EPS §11 |
 | Normalized schema as the structural source of truth | **Pipeline readiness** requires every artifact after `normalized/` to trace back to exactly one normalized schema. An SDD built straight from a source schema is allowed and recorded honestly, but it is never pipeline-ready, and nothing may mix two normalized schemas. | EPS R-E7; EX-07, EX-17 |
 
 ### Second review (2026-11-02)
@@ -74,6 +74,18 @@ untested cases outside them, resolved as follows:
 | Negative `bytes` | `minimum: 0` in the record schema. | `schemas/artifact-record-v1.schema.json` |
 | Rule references | The work-folder rule is R-P4.9 everywhere. | EPS R-P6; examples index |
 | D11 terminology | `pipelineReady` is defined as structural readiness for downstream processing only, not completeness of provenance, verified history or authenticity. | EPS R-E7 |
+
+### Final confirmation review (2026-11-03)
+
+The registrar independently verified EX-24 and EX-25 and checked all 25 reports for consistency (88 reported
+artifacts, 50 revision heads, no discrepancies). Architecture, D13–D15 and the slice 1 fixtures were approved, and
+the contract approved for freezing after three wording corrections, which do not change any expected report:
+
+| Correction | Resolution | Where |
+|---|---|---|
+| 1. Outdated descriptions in this proposal | The first review's table now describes `{path, sha256}` source members, the artifact-name collision across machines (EX-25) and the Node `wx` fallback in place of `rename()`. | §3 above |
+| 2. Damaged-record retry | A record's name follows from its artifact's, so a new record needs the artifact written again under a later `createdAt`; the damaged files stay untouched. When all four prefixes at one time are taken (for example by a partial artifact under the 64-character name), the writer takes a later `createdAt`; E-NAME-TAKEN is left for a writer whose time is fixed. | EPS R-W1, §10 |
+| 3. Writer conformance | A writer conforms when no commit it completes introduces an evaluation error; interrupted operations are covered by §10, and external mutations by R-W10. | EPS conformance |
 
 ## 4. The module (slices 2 and 3)
 
