@@ -87,6 +87,35 @@ the contract approved for freezing after three wording corrections, which do not
 | 2. Damaged-record retry | A record's name follows from its artifact's, so a new record needs the artifact written again under a later `createdAt`; the damaged files stay untouched. When all four prefixes at one time are taken (for example by a partial artifact under the 64-character name), the writer takes a later `createdAt`; E-NAME-TAKEN is left for a writer whose time is fixed. | EPS R-W1, §10 |
 | 3. Writer conformance | A writer conforms when no commit it completes introduces an evaluation error; interrupted operations are covered by §10, and external mutations by R-W10. | EPS conformance |
 
+### Slice 2: readings of the frozen text (2026-11-03)
+
+Implementing §7 and §8 needed a reading of a few places the frozen text leaves open. None changes an expected
+report, and each is implemented as stated here and covered by a unit test. The registrar **approved S1–S8** as valid
+interpretations of the frozen v0.1 contract; no contract change was needed.
+
+| # | Where | Reading implemented |
+|---|---|---|
+| S1 | R-E5.1 "whose sha256" | The hash an unparseable revision's **name** carries (R-B4), since that is what parents cite; the hash of a truncated file's bytes is never cited. So a cited but unparseable revision is E-REVISION-INVALID (damaged), and its citer also gets E-MISSING-PARENT. |
+| S2 | R-P1, R-P3, R-E1 | A missing `@context` or `contractVersion` is a schema failure (E-RECORD-INVALID, E-PROJECT-INVALID, E-REVISION-INVALID), not E-CTX-EXTERNAL or E-UNSUPPORTED-VERSION, which need a value that differs. |
+| S3 | R-P4.1 "parses as JSON" | Strict UTF-8: a byte-order mark or invalid UTF-8 fails to parse. |
+| S4 | R-P4.10, R-P5 "sorted" | Read literally: inputs and a revision's `current` may repeat a key (non-decreasing order); `parents` and `members` are strictly increasing, as their rules say "without duplicates". |
+| S5 | R-E6 UPSTREAM-UNSETTLED | Applies to same-stage dependencies too: an artifact depending on another in a stage with no revision yet (`empty`) is unsettled. Uncommitted chains and self-citations therefore also carry UPSTREAM-UNSETTLED. |
+| S6 | §2, R-E2 | A regular **file** at the root named like a stage is ignored (§2: other root entries are ignored); only a link or special entry there is W-FOREIGN-FILE. A `work` entry that is a file, not a folder, is W-FOREIGN-FILE. |
+| S7 | R-E5.5 | E-CURRENT-UNRESOLVED is checked whenever there is exactly one head, also in a stage that is incomplete. |
+| S8 | R-W4 | "Damaged because of E-REVISION-INVALID" includes the other first-failure codes of an invalid revision (E-CTX-EXTERNAL, E-FOREIGN-PROJECT, E-WRONG-RESPONSIBILITY): only damage from E-CURRENT-UNRESOLVED alone allows a repair revision. |
+
+The project API also has refusals of its own that the contract does not name (for example `STAGE-CHANGED` for
+R-W5, `NOT-RESPONSIBLE` for a stage the tool does not host); they are writer errors, never evaluation
+diagnostics, and they carry no `E-` prefix except the contract's E-NAME-TAKEN.
+
+The registrar's implementation review asked for two corrections, both made with regression tests that fail on the
+earlier code:
+
+| Correction | Resolution |
+|---|---|
+| R-W5: a revision appearing between the evaluation and the snapshot of revision names escaped detection | `commit()` and `merge()` take the revision names **before** evaluating, so any revision that appears afterwards stops the write with STAGE-CHANGED |
+| R-W1: an artifact with matching bytes whose record name held a folder or another non-file looped forever | Such a record name is unusable, so the writer takes a later `createdAt` (R-W1, same bytes with a different record), and each candidate name is retried at most four times; nothing is overwritten |
+
 ## 4. The module (slices 2 and 3)
 
 | Layer | Contents | I/O |
@@ -132,7 +161,7 @@ and which time it records) are settled in the SDD tool's own proposal.
 | # | Slice | Delivers | Status |
 |---|---|---|---|
 | 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | **frozen** (2026-11-03) |
-| 2 | Contract module + memory backend | The pure evaluation and project API. The 25 expected reports are its conformance tests, and independent unit tests cover operations and edge cases the fixtures do not; passing the examples is not taken as exhaustive correctness | **authorized**, in progress |
+| 2 | Contract module + memory backend | The pure evaluation and project API. The 25 expected reports are its conformance tests, and independent unit tests cover operations and edge cases the fixtures do not; passing the examples is not taken as exhaustive correctness | **implemented**; readings S1–S8 approved; awaiting the registrar's final confirmation |
 | 3 | Node and browser backends | `node:fs` and File System Access backends, browser session handling, cloud-folder verification (§11) | |
 | 4 | SDD project mode (SDD v1.1) | The SDD tool vendors the module: project folder, resume, Reopen; CLI `--project <dir>` | |
 | later | Other stages | Normalizer, RML generator, RDF, graph loader and diagram exporter adopt the module as they are built | |

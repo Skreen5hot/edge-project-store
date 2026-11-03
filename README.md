@@ -4,8 +4,8 @@ A shared project folder for offline, edge-canonical data pipelines, and one smal
 pipeline reuses to read and write it.
 
 **Status:** contract v0.1 **frozen** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 25
-synthetic example projects with their expected evaluation reports. The module (slice 2) is in progress. See [`PROPOSAL.md`](PROPOSAL.md) for
-the plan and the decisions behind it.
+synthetic example projects with their expected evaluation reports. The module (slice 2) is implemented, awaiting
+final confirmation. See [`PROPOSAL.md`](PROPOSAL.md) for the plan and the decisions behind it.
 
 ## The idea
 
@@ -34,6 +34,11 @@ report of what is current, out of date, in conflict or damaged.
 | [`schemas/`](schemas/) | JSON Schemas for the project file, artifact records, stage revisions and the evaluation report |
 | [`examples/`](examples/) | Synthetic project folders, each with the report a conforming reader must produce |
 | [`tools/gen-examples.mjs`](tools/gen-examples.mjs) | Builds the examples; `--check` verifies them byte for byte |
+| [`src/`](src/) | The module (slice 2): [`contract.mjs`](src/contract.mjs) (pure evaluation, names, canonical bytes), [`project.mjs`](src/project.mjs) (the writer rules over a backend), [`memory-backend.mjs`](src/memory-backend.mjs); entry point [`index.mjs`](src/index.mjs) |
+| [`test/`](test/) | Conformance tests (the 25 examples) and independent unit tests |
+
+Run everything with `npm run check` (Node 22 or later, no dependencies): the examples and the embedded schemas
+are verified, then all tests run.
 
 ## Principles
 
