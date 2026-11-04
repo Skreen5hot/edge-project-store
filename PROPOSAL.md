@@ -1,7 +1,7 @@
 # edge-project-store: proposal
 
-**Status:** architecture approved by the registrar. Contract v0.1 is **frozen** (2026-11-03) and slice 2 is
-authorized. Nothing is published; publication is a separate decision.
+**Status:** architecture approved by the registrar. Contract **v0.2** (2026-11-04) supersedes v0.1 (frozen
+2026-11-03, tag `eps-v0.1`). Nothing is published; publication is a separate decision.
 
 ## 1. Problem
 
@@ -30,8 +30,8 @@ The tools share a **folder contract**, not a server, a database or a common appl
 4. Each artifact has a **record** naming its exact inputs by path and SHA-256. A stage's state is a chain of
    **revisions**, each naming its parent revisions, much like commits.
 5. One pure **evaluation** turns a folder into a report: what is current, what is out of date and why (recursively,
-   including changes to the set of source files), what is in conflict, what is damaged, and what is
-   **pipeline-ready**.
+   including changes to the set of source files), what is in conflict, what is damaged, and what could not be
+   evaluated because a file could not be read.
 6. Work in progress lives in `<stage>/work/`, belongs to the stage's responsibility, and is never an input to
    anything.
 
@@ -45,7 +45,7 @@ The tools share a **folder contract**, not a server, a database or a common appl
 | Recovery from interrupted writes and conflicting revisions | Defined commit order (artifact, record, then revision as the commit point), a table of every interrupted state with its diagnostic and recovery, merge revisions for conflicts, repair revisions for damaged heads, and a refusal to write on damage. | EPS R-W2–R-W4, §10; EX-09–EX-12, EX-15 |
 | Integrity vs provenance vs deterministic generation | Separated: integrity and input consistency are **checked**; provenance completeness and deterministic generation are **declared** (`generation`: `received`, `deterministic`, `assisted`); authenticity is not provided. | EPS §12 |
 | Actual atomic-write guarantees | Documented per backend, each with a declared guarantee level (R-W9). Node is **exclusive**: temp file, `fsync`, `link()` as an atomic create-if-absent, with an exclusive-create (`wx`) fallback; `rename()` onto a final name is forbidden. The browser is **checked**: check the name, temp file, `move()`, with a direct-write fallback that relies on Chromium behaviour. Correctness never depends on atomicity, because every file is checked against a hash. Cloud-folder behaviour is to be verified in slice 3. | EPS §11 |
-| Normalized schema as the structural source of truth | **Pipeline readiness** requires every artifact after `normalized/` to trace back to exactly one normalized schema. An SDD built straight from a source schema is allowed and recorded honestly, but it is never pipeline-ready, and nothing may mix two normalized schemas. | EPS R-E7; EX-07, EX-17 |
+| Normalized schema as the structural source of truth | **Pipeline readiness** requires every artifact after `normalized/` to trace back to exactly one normalized schema. An SDD built straight from a source schema is allowed and recorded honestly, but it is never pipeline-ready, and nothing may mix two normalized schemas. *Superseded in v0.2 (D16): the contract governs structure, not process.* | EPS R-E7 (retired); EX-07, EX-17 |
 
 ### Second review (2026-11-02)
 
@@ -73,7 +73,7 @@ untested cases outside them, resolved as follows:
 | Same bytes, different provenance | An identical artifact is reused only if its record is also byte-identical; otherwise the writer takes a later `createdAt`, giving a new name and its own record. | EPS R-W1 |
 | Negative `bytes` | `minimum: 0` in the record schema. | `schemas/artifact-record-v1.schema.json` |
 | Rule references | The work-folder rule is R-P4.9 everywhere. | EPS R-P6; examples index |
-| D11 terminology | `pipelineReady` is defined as structural readiness for downstream processing only, not completeness of provenance, verified history or authenticity. | EPS R-E7 |
+| D11 terminology | `pipelineReady` is defined as structural readiness for downstream processing only, not completeness of provenance, verified history or authenticity. *Superseded in v0.2 (D16).* | EPS R-E7 (retired) |
 
 ### Final confirmation review (2026-11-03)
 
@@ -87,7 +87,7 @@ the contract approved for freezing after three wording corrections, which do not
 | 2. Damaged-record retry | A record's name follows from its artifact's, so a new record needs the artifact written again under a later `createdAt`; the damaged files stay untouched. When all four prefixes at one time are taken (for example by a partial artifact under the 64-character name), the writer takes a later `createdAt`; E-NAME-TAKEN is left for a writer whose time is fixed. | EPS R-W1, §10 |
 | 3. Writer conformance | A writer conforms when no commit it completes introduces an evaluation error; interrupted operations are covered by §10, and external mutations by R-W10. | EPS conformance |
 
-### Slice 2: readings of the frozen text (2026-11-03)
+### Slice 2: readings of the frozen v0.1 text (2026-11-03)
 
 Implementing §7 and §8 needed a reading of a few places the frozen text leaves open. None changes an expected
 report, and each is implemented as stated here and covered by a unit test. The registrar **approved S1–S8** as valid
@@ -116,6 +116,23 @@ earlier code:
 | R-W5: a revision appearing between the evaluation and the snapshot of revision names escaped detection | `commit()` and `merge()` take the revision names **before** evaluating, so any revision that appears afterwards stops the write with STAGE-CHANGED |
 | R-W1: an artifact with matching bytes whose record name held a folder or another non-file looped forever | Such a record name is unusable, so the writer takes a later `createdAt` (R-W1, same bytes with a different record), and each candidate name is retried at most four times; nothing is overwritten |
 
+### Registrar decision on EPS v0.2 (2026-11-04)
+
+On [`proposals/2026-11-04-eps-v0.2.md`](proposals/2026-11-04-eps-v0.2.md), answering SDD's feedback
+([`review/2026-11-04-sdd-feedback.md`](review/2026-11-04-sdd-feedback.md)):
+
+| Item | Decision | Where |
+|---|---|---|
+| The direction: structure and documents, not process | **Approved as written**: R-E7, `pipelineReady`, `notReadyBecause`, its four codes and the §3 column removed | D16; EPS §3, R-E7 (retired) |
+| Q1 versioning | **Option A**: `contractVersion: 2` everywhere, context `eps-v2.jsonld`, schemas `*-v2`; annotated tag `eps-v0.1` on `7526a69` | D16; EPS R-P1, R-P3 |
+| Q2 examples | **Approved**; the folders of EX-07 and EX-17 are **renamed** (`EX-07-sdd-from-source`, `EX-17-two-normalized-inputs`), not only re-described; numbers unchanged | `examples/` |
+| Q3 order | **Approved**: v0.2 before M2; M1 is validated once, on the v0.2 build | MILESTONES.md |
+| Item 2: SDD v1.2 | Approved | MILESTONES.md, §6 |
+| Item 3: M2 checks for a saved copy opened from disk | Approved | MILESTONES.md, M2 |
+| Item 4: retry `replace()` on Windows | Approved: up to 5 retries on EPERM, EBUSY, EACCES, about 1.5 s | EPS §11; `src/node-backend.mjs` |
+| Item 5: unreadable files | **Changed by the registrar**: never stop; report E-UNREADABLE with the path and error, and mark what depends on it as not evaluable rather than out of date or damaged. `eps` exits 1 | D17; EPS R-E10 |
+| Item 6: temporary files seen on the other PC | Approved | M1 validation, step 3 |
+
 ## 4. The module (slices 2 and 3)
 
 | Layer | Contents | I/O |
@@ -135,8 +152,8 @@ lineage).
 
 ## 5. How the SDD tool would use it (proposed separately in the SDD repository)
 
-- **Open project folder:** the tool reads the current normalized schema. If there is none yet, it may work from a
-  schema in `source/`, and its SDD is then recorded honestly as not pipeline-ready (EX-07).
+- **Open project folder:** the tool takes its input schema from wherever it is kept: a normalized schema, or a schema
+  in `source/`. The contract does not judge that choice (EX-07); SDD takes a "normalish" schema, whatever produced it.
 - **Save SDD:** a new SDD file, its record and a new `sdd/` revision. As today, an SDD is never overwritten.
 - **Resume from `sdd/work/`** (decision D6, revised by the registrar):
   - restored: the LLM's proposals, the pasted replies with their check results, rejections, and **acceptances
@@ -160,17 +177,18 @@ and which time it records) are settled in the SDD tool's own proposal.
 
 | # | Slice | Delivers | Status |
 |---|---|---|---|
-| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | **frozen** (2026-11-03) |
+| 1 | Contract v0.1 | Contract text, context, JSON Schemas, 25 example projects with expected reports | frozen (2026-11-03), tag `eps-v0.1` |
+| 1b | Contract v0.2 | Readiness removed (D16); unreadable files reported (D17); context, schemas and the 25 reports at version 2 | **done** (2026-11-04) |
 | 2 | Contract module + memory backend | The pure evaluation and project API. The 25 expected reports are its conformance tests, and independent unit tests cover operations and edge cases the fixtures do not; passing the examples is not taken as exhaustive correctness | **implemented**; readings S1–S8 approved; awaiting the registrar's final confirmation |
 | 3 | Node and browser backends | `node:fs` and File System Access backends, browser session handling, cloud-folder verification (§11) | |
-| 4 | SDD project mode (SDD v1.1) | The SDD tool vendors the module: project folder, resume, Reopen; CLI `--project <dir>` | |
+| 4 | SDD project mode (SDD v1.2) | The SDD tool vendors the module: project folder, resume, Reopen; CLI `--project <dir>` | |
 | later | Other stages | Normalizer, RML generator, RDF, graph loader and diagram exporter adopt the module as they are built | |
 
 ## 7. Non-goals
 
 Synchronising, merging or locking across machines (file sync is the user's choice; the contract detects and reports);
 a server, an account or any network request; storing artifacts in browser storage; signing or chaining artifacts;
-renaming a project (v0.1).
+renaming a project.
 
 ## 8. Decisions
 
@@ -184,10 +202,12 @@ renaming a project (v0.1).
 | D6 | Session restore brings back proposals, rejections and unsaved acceptances, marked as unsaved; nothing is committed on resume; changed inputs require revalidation. | **revised by the registrar** (SDD-side, §5) |
 | D7 | `diagrams/` is owned by the `diagram-exporter` responsibility, which may run inside another tool. | **approved** (EPS §3) |
 | D8 | MIT licence; the adapted mermaid code is CC0. | proposed |
-| D9 | Every input declares `dependency` or `history`; history is verified for identity and integrity but does not affect freshness or structural roots; same-stage inputs are not automatically history; a same-stage dependency is exempt only from "superseded". | **approved** (independent review) |
+| D9 | Every input declares `dependency` or `history`; history is verified for identity and integrity but does not affect freshness; same-stage inputs are not automatically history; a same-stage dependency is exempt only from "superseded". | **approved** (independent review) |
 | D10 | The repository stays local and unpublished until a separate publication decision. | **registrar** |
-| D11 | Unverified history (`historyVerified: false`) is reported but does not block `pipelineReady`, which means structural readiness only. | **approved** (independent review) |
+| D11 | Unverified history (`historyVerified: false`) is reported but does not block `pipelineReady`, which means structural readiness only. | **superseded by D16** (v0.2) |
 | D12 | Input paths: the schema accepts any string; the contract's safe-path rule refuses unsafe ones (E-PATH-UNSAFE) before the work-folder rule. | **approved with constraints** (second review), constraints applied |
 | D13 | Writers never delete or modify committed files; people's changes are external mutations that the evaluation reports; no retirement operation in v0.1. | **approved** (final review) |
 | D14 | Backends declare a write guarantee level, *exclusive* or *checked*; exclusive is mandatory where available. | **approved** (final review) |
 | D15 | Revision names carry the full SHA-256; artifact names keep the short prefix, with cross-machine collisions detected and recoverable. | **approved** (final review) |
+| D16 | The contract governs project structure and document management, not pipeline process: no stage is required to feed another, so pipeline readiness (R-E7, `pipelineReady`, `notReadyBecause`) is removed. Supersedes the first review's "normalized schema as the structural source of truth" and D11. Versioned as one number: `contractVersion: 2`, context `eps-v2`, schemas `*-v2`; v0.1 kept at the tag `eps-v0.1`. | **approved** (registrar, 2026-11-04) |
+| D17 | A file that cannot be read is reported (E-UNREADABLE, with the error) and never stops the evaluation; what depends on it is not evaluable (`null`) unless a definite reason decides it, and a stage whose heads cannot be known is `unevaluable`. | **approved** (registrar, 2026-11-04; details in R-E10 for confirmation) |

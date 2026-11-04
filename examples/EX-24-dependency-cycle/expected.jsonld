@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000024",
   "valid": true,
   "stages": {
@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-1fb125ba4b6143e373f434bc38aa825a0cdbaeaac0dab6657edf86ddd074b690.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-89fd646dd00e9312dbae36ee4c410c27808d43b1cf2ad346dfa881887f839f3e.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-b1df1c568084f00d6f6d417208c976b52fafa9ab20d1db224b2ff69586562c48.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-1577e46fdf156e750e7be556a20bc0d7f6425ee0a94e60570ac9c9a0eab56729.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -48,7 +48,7 @@
     "diagrams": {
       "status": "out-of-date",
       "heads": [
-        "diagrams/revisions/rev-20261101T112000Z-0d35375c5061cbb6094b46287e1d979b5c9c25ab008ae1e4d2d27cfc689ff2a5.jsonld"
+        "diagrams/revisions/rev-20261101T112000Z-f33334c753f85679ccc776ecf4264785c91141264f4c06184bdef72103c3b064.jsonld"
       ],
       "current": [
         "diagrams/diagram-20261101T110000Z-86560f7b.mmd",
@@ -71,11 +71,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE"
-      ]
+      "historyBecause": []
     },
     {
       "path": "diagrams/diagram-20261101T110500Z-32ff293c.mmd",
@@ -90,11 +86,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE"
-      ]
+      "historyBecause": []
     },
     {
       "path": "diagrams/diagram-20261101T111000Z-e2e2b0b4.mmd",
@@ -109,11 +101,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE"
-      ]
+      "historyBecause": []
     },
     {
       "path": "normalized/normalized-20261101T091000Z-4c173267.json",
@@ -123,9 +111,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
@@ -135,9 +121,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "source/schema-20261101T090000Z-67daa493.json",
@@ -147,9 +131,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": null,
-      "notReadyBecause": []
+      "historyBecause": []
     }
   ],
   "diagnostics": []

@@ -3,9 +3,10 @@
 A shared project folder for offline, edge-canonical data pipelines, and one small module that every tool in the
 pipeline reuses to read and write it.
 
-**Status:** contract v0.1 **frozen** (slice 1): the contract, its JSON-LD context and JSON Schemas, and 25
-synthetic example projects with their expected evaluation reports. The module (slice 2) is implemented, awaiting
-final confirmation. See [`PROPOSAL.md`](PROPOSAL.md) for the plan and the decisions behind it.
+**Status:** contract **v0.2** (2026-11-04): the contract, its JSON-LD context and JSON Schemas, and 25 synthetic
+example projects with their expected evaluation reports; v0.1 is kept at the tag `eps-v0.1`. Module (slice 2) and
+M1 (project folders on disk) are built. See [`PROPOSAL.md`](PROPOSAL.md) for the decisions and
+[`MILESTONES.md`](MILESTONES.md) for the plan.
 
 ## The idea
 
@@ -19,21 +20,23 @@ use one **project folder** with a fixed layout:
   (work in progress is the one mutable exception);
 - every artifact has a record of the exact inputs it was built from, so any tool can tell, recursively, what is
   out of date and why;
-- the normalized schema is the structural source of truth: later artifacts are pipeline-ready only when they trace
-  back to exactly one normalized schema.
+- the contract governs how a project is kept, not how the pipeline is run: a tool may take any registered artifact
+  as its input, whatever stage it is in;
+- a file that cannot be read (for example an OneDrive file not downloaded while offline) is reported, and what
+  depends on it is marked as not evaluated, rather than the whole project failing to open.
 
 The tools share a **contract**, not a server, a database or a lock service. One pure evaluation turns a folder into a
-report of what is current, out of date, in conflict or damaged.
+report of what is current, out of date, in conflict, damaged, or not evaluable because a file could not be read.
 
 ## Contents
 
 | Path | What |
 |---|---|
-| [`spec/edge-project-contract.md`](spec/edge-project-contract.md) | The contract (EPS v0.1, frozen) |
-| [`context/eps-v1.jsonld`](context/eps-v1.jsonld) | The JSON-LD context, bundled by every tool and never fetched |
+| [`spec/edge-project-contract.md`](spec/edge-project-contract.md) | The contract (EPS v0.2) |
+| [`context/eps-v2.jsonld`](context/eps-v2.jsonld) | The JSON-LD context, bundled by every tool and never fetched |
 | [`schemas/`](schemas/) | JSON Schemas for the project file, artifact records, stage revisions and the evaluation report |
 | [`examples/`](examples/) | Synthetic project folders, each with the report a conforming reader must produce |
-| [`tools/gen-examples.mjs`](tools/gen-examples.mjs) | Builds the examples; `--check` verifies them byte for byte |
+| [`tools/gen-examples.mjs`](tools/gen-examples.mjs), [`tools/gen-schemas.mjs`](tools/gen-schemas.mjs) | Build the examples and the schemas; `--check` verifies them byte for byte |
 | [`src/`](src/) | The module (slice 2): [`contract.mjs`](src/contract.mjs) (pure evaluation, names, canonical bytes), [`project.mjs`](src/project.mjs) (the writer rules over a backend), [`memory-backend.mjs`](src/memory-backend.mjs); entry point [`index.mjs`](src/index.mjs) |
 | [`test/`](test/) | Conformance tests (the 25 examples) and independent unit tests |
 | [`src/node-backend.mjs`](src/node-backend.mjs), [`bin/eps.mjs`](bin/eps.mjs) | M1: the Node backend and the `eps` tool (`init`, `status`, `report`, `add-source`, `commit`, `merge`) |

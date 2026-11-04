@@ -1,0 +1,21 @@
+{
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
+  "@type": "StageRevision",
+  "contractVersion": 2,
+  "project": "urn:uuid:00000000-0000-4000-8000-000000000017",
+  "stage": "diagrams",
+  "parents": [],
+  "current": [
+    {
+      "role": "diagram",
+      "path": "diagrams/diagram-20261101T110000Z-89caee25.mmd",
+      "sha256": "89caee2599e6c6930e9c697f791e2e49e712c674e6dba15c2574522ad811c8b5"
+    }
+  ],
+  "producedBy": {
+    "responsibility": "diagram-exporter",
+    "tool": "example-diagrams",
+    "version": "0.1.0"
+  },
+  "createdAt": "2026-11-01T11:00:01Z"
+}

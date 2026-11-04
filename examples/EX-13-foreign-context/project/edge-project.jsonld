@@ -2,7 +2,7 @@
   "@context": "https://example.org/ctx.jsonld",
   "@id": "urn:uuid:00000000-0000-4000-8000-000000000013",
   "@type": "EdgeProject",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "name": "Example 13",
   "createdAt": "2026-11-01T08:00:00Z"
 }

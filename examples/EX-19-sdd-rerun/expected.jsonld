@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000019",
   "valid": true,
   "stages": {
@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T120001Z-e407946acac0de10f025d73539fcbe933dc9749f2a2ba1916e84b8bd6431680c.jsonld"
+        "normalized/revisions/rev-20261101T120001Z-cf17bac341de0837af2cccb100513f8683f11e197a1b88c483cf52f5a76a75cb.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T120000Z-7b20871f.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T130001Z-c37bfbe2eb6afd9fbaa3a03d4b28b0225740054563316e5d00fcb1c15e751af5.jsonld"
+        "sdd/revisions/rev-20261101T130001Z-92396ec8207ac3a967d840bee619b42c1f167bb23153e3f5e7e285a6dc44fe32.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T130000Z-7d65e139.jsonld"
@@ -60,11 +60,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "NOT-CURRENT"
-      ]
+      "historyBecause": []
     },
     {
       "path": "normalized/normalized-20261101T120000Z-7b20871f.json",
@@ -74,9 +70,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
@@ -91,12 +85,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE",
-        "NOT-CURRENT"
-      ]
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T130000Z-7d65e139.jsonld",
@@ -106,9 +95,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "source/schema-20261101T090000Z-67daa493.json",
@@ -118,9 +105,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": null,
-      "notReadyBecause": []
+      "historyBecause": []
     }
   ],
   "diagnostics": []

@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000011",
   "valid": true,
   "stages": {
@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-a5c9e975bea632db43b097d631a37523691ca2be62bbd9fdf05fceeb406478c7.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-760d1cf3b64e7f105687eb7b65e7f0c1b6ec4ea74e37e032d7b3c15a60d7313d.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "damaged",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-54877f10506993b8432b4a8bf74978e8867ab4d35f57509e21e2d2cc88305716.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-5bb1f2c8fe8bc1bc58c2bc22929c8bcb8cd8eba0a5540ce2ee6b76cae2a12cc5.jsonld"
       ],
       "current": []
     },
@@ -58,9 +58,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "source/schema-20261101T090000Z-67daa493.json",
@@ -70,15 +68,13 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": null,
-      "notReadyBecause": []
+      "historyBecause": []
     }
   ],
   "diagnostics": [
     {
       "code": "E-CURRENT-UNRESOLVED",
-      "path": "sdd/revisions/rev-20261101T100001Z-54877f10506993b8432b4a8bf74978e8867ab4d35f57509e21e2d2cc88305716.jsonld"
+      "path": "sdd/revisions/rev-20261101T100001Z-5bb1f2c8fe8bc1bc58c2bc22929c8bcb8cd8eba0a5540ce2ee6b76cae2a12cc5.jsonld"
     },
     {
       "code": "E-INTEGRITY",

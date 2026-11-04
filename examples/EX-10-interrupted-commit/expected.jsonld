@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000010",
   "valid": true,
   "stages": {
@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-6edff443220dd7026e84e2a118e1565d119fbe6ad6afdd97b51d6b2d20657502.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-b095e1a0c331243001aef7e1095762d6bda866face27d3bcbf63e27933382b5c.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "ok",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-9d4822be469097580768c8ec06132f843ee9c84c91745d8b8580decfa3d9854d.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-db7075faaa972c1eda8beddf328810a0440d755ff46066ad47f0f3b4a3886e50.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -60,9 +60,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
@@ -72,9 +70,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T120000Z-ccc1e7e8.jsonld",
@@ -84,11 +80,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "NOT-CURRENT"
-      ]
+      "historyBecause": []
     },
     {
       "path": "source/schema-20261101T090000Z-67daa493.json",
@@ -98,9 +90,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": null,
-      "notReadyBecause": []
+      "historyBecause": []
     }
   ],
   "diagnostics": [
@@ -110,7 +100,7 @@
     },
     {
       "code": "W-INTERRUPTED-REVISION",
-      "path": "sdd/revisions/rev-20261101T120001Z-b33d3e535d9fc7d2a7042901889b3687d445656583e1adcfb49bbb6e152be1a1.jsonld"
+      "path": "sdd/revisions/rev-20261101T120001Z-e0753804419df2b5cfdf49f5e23dd142dc66837c9656616d6193e058c81848ae.jsonld"
     },
     {
       "code": "W-UNCOMMITTED",

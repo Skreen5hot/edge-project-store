@@ -1,18 +1,20 @@
-// The EPS v0.1 contract as pure functions: names, canonical bytes, metadata checks and the evaluation (EPS §7).
+// The EPS v0.2 contract as pure functions: names, canonical bytes, metadata checks and the evaluation (EPS §7).
 // Nothing here touches a file system, a clock or a network. The evaluation reads a **tree**, an in-memory picture
 // of a project folder that a backend builds (src/project.mjs):
 //
 //   { type: 'dir', entries: Map<name, node> } | { type: 'file', bytes: Uint8Array } | { type: 'other' }
+//   | { type: 'unreadable', error: string }
 //
 // `other` is anything that is neither a regular file nor a folder (a symbolic link, junction or shortcut). It is
-// never followed or read (R-B6, R-E2).
+// never followed or read (R-B6, R-E2). `unreadable` is a file that could not be read or a folder that could not be
+// listed, with the error the backend gave (R-E10).
 
 import { sha256 } from './sha256.mjs';
 import { isValid } from './jsonschema.mjs';
 import { PROJECT_SCHEMA, RECORD_SCHEMA, REVISION_SCHEMA } from './schemas.mjs';
 
-export const CONTEXT_IRI = 'https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld';
-export const CONTRACT_VERSION = 1;
+export const CONTEXT_IRI = 'https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld';
+export const CONTRACT_VERSION = 2;
 export const PROJECT_FILE = 'edge-project.jsonld';
 export const RECORD_SUFFIX = '.record.jsonld';
 export const TEMP_PREFIX = '.eps-tmp-';
@@ -89,13 +91,29 @@ export function isSafePath(path) {
   return segments.every((s) => SEGMENT.test(s) && !s.endsWith('.') && !DEVICE.test(s));
 }
 
-/** Resolves a safe path one exact segment at a time, never through `other` entries. Returns the file node or null. */
-export function resolveFile(tree, path) {
-  let node = tree;
+/**
+ * Resolves a safe path one exact segment at a time, never through `other` entries. Returns the file node, an
+ * `unreadable` node when the file or a folder on the way could not be read, or null.
+ */
+export function resolvePath(tree, path) {
+  return locate(tree, path).node;
+}
+
+// The node at a path and where resolution stopped (`at`: the unreadable file or folder, if any).
+function locate(tree, path) {
+  let node = tree, at = '';
   for (const segment of path.split('/')) {
-    if (node?.type !== 'dir') return null;
+    if (node?.type === 'unreadable') return { node, at };
+    if (node?.type !== 'dir') return { node: null, at };
     node = node.entries.get(segment);
+    at = at ? `${at}/${segment}` : segment;
   }
+  return { node: node?.type === 'file' || node?.type === 'unreadable' ? node : null, at };
+}
+
+/** The file node at a safe path, or null (unreadable counts as absent). */
+export function resolveFile(tree, path) {
+  const node = resolvePath(tree, path);
   return node?.type === 'file' ? node : null;
 }
 
@@ -109,6 +127,7 @@ const isSorted = (list, key, strict) =>
 
 /** R-E1 / R-P2 / R-P3: {ok: true, project} or {ok: false, code}. */
 export function checkProjectFile(node) {
+  if (node?.type === 'unreadable') return { ok: false, code: 'E-UNREADABLE', error: node.error };
   if (node?.type !== 'file') return { ok: false, code: 'E-NOT-A-PROJECT' };
   const parsed = parseJson(node.bytes);
   if (!parsed.ok) return { ok: false, code: 'E-PROJECT-INVALID' };
@@ -184,6 +203,13 @@ export function checkRevision(bytes, { projectId, stage, name }) {
 // Evaluation (EPS §7)
 
 const UNSETTLED = new Set(['damaged', 'incomplete', 'conflicted', 'empty']);
+// Reasons that say a value could not be evaluated, rather than that it is wrong (R-E10).
+const INDEFINITE = new Set(['INPUT-UNREADABLE', 'UPSTREAM-UNEVALUABLE', 'HISTORY-UNREADABLE']);
+
+// Three-valued verdict: false on any definite reason, null when only indefinite ones remain, true otherwise.
+const verdict = (reasons) => (reasons.some((r) => !INDEFINITE.has(r.code)) ? false : reasons.length ? null : true);
+const byInputThenCode = (x, y) => compare(x.input, y.input) || compare(x.code, y.code);
+const unique = (reasons) => reasons.filter((r, i) => reasons.findIndex((q) => q.code === r.code && q.input === r.input) === i);
 
 function reportHead(project, valid) {
   return { '@context': CONTEXT_IRI, '@type': 'ProjectReport', contractVersion: CONTRACT_VERSION, project, valid };
@@ -194,45 +220,55 @@ export function evaluate(tree) {
   const projectNode = tree?.type === 'dir' ? tree.entries.get(PROJECT_FILE) : undefined;
   const projectCheck = checkProjectFile(projectNode);
   if (!projectCheck.ok) {
-    return { ...reportHead(null, false), stages: {}, artifacts: [], diagnostics: [{ code: projectCheck.code, path: PROJECT_FILE }] };
+    const d = { code: projectCheck.code, path: PROJECT_FILE };
+    if (projectCheck.error) d.error = projectCheck.error;
+    return { ...reportHead(null, false), stages: {}, artifacts: [], diagnostics: [d] };
   }
   const projectId = projectCheck.project['@id'];
   const diagnostics = [];
   const diag = (code, path) => diagnostics.push({ code, path });
+  const unreadable = (path, node) => diagnostics.push({ code: 'E-UNREADABLE', path, error: node.error });
 
-  // R-E2, R-E3: classify each stage folder; register artifacts.
+  // R-E2, R-E3, R-E10: classify each stage folder; register artifacts.
   const registered = new Map(); // path → {stage, record}
-  const revisionFiles = new Map(); // stage → [{name, path, bytes}]
+  const unknown = new Map(); // artifact path → its record's sha256, or null: present but not evaluable (R-E10)
+  const revisionFiles = new Map(); // stage → [{name, path, node}]
+  const folderUnreadable = new Set(); // stages whose folder or revisions/ could not be listed
   for (const { stage } of STAGES) {
     revisionFiles.set(stage, []);
     const folder = tree.entries.get(stage);
     if (folder === undefined || folder.type === 'file') continue;
+    if (folder.type === 'unreadable') { unreadable(stage, folder); folderUnreadable.add(stage); continue; }
     if (folder.type !== 'dir') { diag('W-FOREIGN-FILE', stage); continue; }
     const records = new Map();
     const artifacts = [];
+    const isContent = (node) => node.type === 'file' || node.type === 'unreadable';
     for (const [name, node] of folder.entries) {
       const path = `${stage}/${name}`;
       if (name.startsWith(TEMP_PREFIX)) diag('W-TEMP-FILE', path);
       else if (name.startsWith('.')) continue;
       else if (name === 'work' && node.type === 'dir') continue;
       else if (node.type === 'other') diag('W-FOREIGN-FILE', path);
-      else if (name === 'revisions' && node.type === 'dir' && stage !== 'source') classifyRevisions(stage, node);
-      else if (node.type === 'file' && parseArtifactName(name)) artifacts.push(name);
-      else if (node.type === 'file' && name.endsWith(RECORD_SUFFIX) && parseArtifactName(name.slice(0, -RECORD_SUFFIX.length))) {
+      else if (name === 'revisions' && stage !== 'source' && node.type === 'dir') classifyRevisions(stage, node);
+      else if (name === 'revisions' && stage !== 'source' && node.type === 'unreadable') { unreadable(path, node); folderUnreadable.add(stage); }
+      else if (isContent(node) && parseArtifactName(name)) artifacts.push(name);
+      else if (isContent(node) && name.endsWith(RECORD_SUFFIX) && parseArtifactName(name.slice(0, -RECORD_SUFFIX.length))) {
         records.set(name.slice(0, -RECORD_SUFFIX.length), node);
       } else diag('W-FOREIGN-FILE', path);
     }
     for (const [artifact] of records) {
-      if (folder.entries.get(artifact)?.type !== 'file') diag('W-ORPHAN-RECORD', `${stage}/${artifact}${RECORD_SUFFIX}`);
+      if (!artifacts.includes(artifact)) diag('W-ORPHAN-RECORD', `${stage}/${artifact}${RECORD_SUFFIX}`);
     }
     for (const name of artifacts) {
       const path = `${stage}/${name}`;
       const recordNode = records.get(name);
       if (!recordNode) { diag('W-UNREGISTERED', path); continue; }
+      if (recordNode.type === 'unreadable') { unreadable(path + RECORD_SUFFIX, recordNode); unknown.set(path, null); continue; }
       const check = checkRecord(recordNode.bytes, { projectId, stage, name });
       if (!check.ok) { diag(check.code, path + RECORD_SUFFIX); continue; }
-      const bytes = folder.entries.get(name).bytes;
-      if (sha256(bytes) !== check.record.sha256 || bytes.length !== check.record.bytes) { diag('E-INTEGRITY', path); continue; }
+      const node = folder.entries.get(name);
+      if (node.type === 'unreadable') { unreadable(path, node); unknown.set(path, check.record.sha256); continue; }
+      if (sha256(node.bytes) !== check.record.sha256 || node.bytes.length !== check.record.bytes) { diag('E-INTEGRITY', path); continue; }
       registered.set(path, { stage, record: check.record });
     }
   }
@@ -242,27 +278,35 @@ export function evaluate(tree) {
       const path = `${stage}/revisions/${name}`;
       if (name.startsWith(TEMP_PREFIX)) diag('W-TEMP-FILE', path);
       else if (name.startsWith('.')) continue;
-      else if (node.type === 'file' && parseRevisionName(name)) revisionFiles.get(stage).push({ name, path, bytes: node.bytes });
+      else if ((node.type === 'file' || node.type === 'unreadable') && parseRevisionName(name)) revisionFiles.get(stage).push({ name, path, node });
       else diag('W-FOREIGN-FILE', path);
     }
   }
 
-  // R-E4: source membership.
+  // R-E4: source membership. An unknown source file is neither a member nor a non-member.
   const sourceMembers = [...registered].filter(([, a]) => a.stage === 'source')
     .map(([path, a]) => ({ path, sha256: a.record.sha256 })).sort((a, b) => compare(a.path, b.path));
+  const sourceUnknown = [...unknown.keys()].filter((p) => p.startsWith('source/')).sort(compare);
+  const sourceEvaluable = !folderUnreadable.has('source') && sourceUnknown.length === 0;
 
   // R-E5: revision graph, heads and the settled part of each stage's status.
-  const stageState = new Map(); // stage → {status, heads, current: Set|null, headCurrent}
-  stageState.set('source', { status: sourceMembers.length ? 'ok' : 'empty', heads: [], current: new Set(sourceMembers.map((m) => m.path)) });
+  const stageState = new Map(); // stage → {status, heads, current: Set, headCurrent, known}
+  stageState.set('source', {
+    status: !sourceEvaluable ? 'unevaluable' : sourceMembers.length ? 'ok' : 'empty',
+    heads: [], current: new Set(sourceMembers.map((m) => m.path)), headCurrent: [], known: true,
+  });
   const committed = new Set(); // `${path} ${sha256}` listed by any well-formed revision
   for (const { stage } of STAGES.slice(1)) {
-    const files = revisionFiles.get(stage);
     const wellFormed = new Map(); // revision sha256 → {path, revision}
+    const unreadableIds = new Set(); // identities named by revision files that could not be read
     const unparsed = [];
     let damaged = false;
-    for (const f of files) {
-      const check = checkRevision(f.bytes, { projectId, stage, name: f.name });
-      if (check.ok) wellFormed.set(parseRevisionName(f.name).sha256, { path: f.path, revision: check.revision });
+    let graphKnown = !folderUnreadable.has(stage);
+    for (const f of revisionFiles.get(stage)) {
+      const identity = parseRevisionName(f.name).sha256;
+      if (f.node.type === 'unreadable') { unreadable(f.path, f.node); unreadableIds.add(identity); graphKnown = false; continue; }
+      const check = checkRevision(f.node.bytes, { projectId, stage, name: f.name });
+      if (check.ok) wellFormed.set(identity, { path: f.path, revision: check.revision });
       else if (check.unparsed) unparsed.push(f);
       else { diag(check.code, f.path); damaged = true; }
     }
@@ -276,31 +320,48 @@ export function evaluate(tree) {
     let incomplete = false;
     for (const { path, revision } of wellFormed.values()) {
       for (const c of revision.current) committed.add(`${c.path} ${c.sha256}`);
-      if (revision.parents.some((p) => !wellFormed.has(p))) { diag('E-MISSING-PARENT', path); incomplete = true; }
+      // A parent named by an unreadable file is present, only not readable (R-E10).
+      if (revision.parents.some((p) => !wellFormed.has(p) && !unreadableIds.has(p))) { diag('E-MISSING-PARENT', path); incomplete = true; }
     }
     const heads = [...wellFormed].filter(([sha]) => !cited.has(sha)).map(([, r]) => r).sort((a, b) => compare(a.path, b.path));
-    if (heads.length === 1) {
-      const resolved = heads[0].revision.current.every((c) => registered.get(c.path)?.record.sha256 === c.sha256);
-      if (!resolved) { diag('E-CURRENT-UNRESOLVED', heads[0].path); damaged = true; }
-    } else if (heads.length > 1) diag('E-STAGE-CONFLICT', stage);
-    const status = damaged ? 'damaged' : incomplete ? 'incomplete' : heads.length > 1 ? 'conflicted'
-      : wellFormed.size === 0 ? 'empty' : 'settled';
+    let currentKnown = graphKnown;
+    if (graphKnown && heads.length === 1) {
+      const states = heads[0].revision.current.map((c) => {
+        if (registered.get(c.path)?.record.sha256 === c.sha256) return 'resolved';
+        if (unknown.has(c.path) && (unknown.get(c.path) === null || unknown.get(c.path) === c.sha256)) return 'unknown';
+        return 'unresolved';
+      });
+      if (states.includes('unresolved')) { diag('E-CURRENT-UNRESOLVED', heads[0].path); damaged = true; }
+      else if (states.includes('unknown')) currentKnown = false;
+    } else if (graphKnown && heads.length > 1) diag('E-STAGE-CONFLICT', stage);
+    const status = damaged ? 'damaged' : incomplete ? 'incomplete' : !currentKnown ? 'unevaluable'
+      : heads.length > 1 ? 'conflicted' : wellFormed.size === 0 ? 'empty' : 'settled';
     stageState.set(stage, {
       status,
-      heads: heads.map((h) => h.path),
+      heads: graphKnown ? heads.map((h) => h.path) : [],
       current: status === 'settled' ? new Set(heads[0].revision.current.map((c) => c.path)) : new Set(),
       headCurrent: status === 'settled' ? heads[0].revision.current.map((c) => c.path) : [],
+      known: graphKnown,
     });
   }
   for (const [path, a] of registered) {
-    if (a.stage !== 'source' && !committed.has(`${path} ${a.record.sha256}`)) diag('W-UNCOMMITTED', path);
+    // R-E5.9, only where every revision file of the stage could be read.
+    if (a.stage !== 'source' && stageState.get(a.stage).known && !committed.has(`${path} ${a.record.sha256}`)) diag('W-UNCOMMITTED', path);
   }
 
-  // R-E6: resolve dependency inputs to edges of the dependency graph.
+  // R-E6: resolve inputs; the dependency inputs that resolve are the edges of the dependency graph.
+  const reportedUnreadable = new Set(diagnostics.filter((d) => d.code === 'E-UNREADABLE').map((d) => d.path));
   const resolution = (input) => {
-    const file = resolveFile(tree, input.path);
-    if (file && sha256(file.bytes) !== input.sha256) return 'ALTERED';
-    return registered.get(input.path)?.record.sha256 === input.sha256 ? 'OK' : 'MISSING';
+    const { node, at } = locate(tree, input.path);
+    if (node?.type === 'unreadable') {
+      // R-E10: a cited file (or a folder on the way) that cannot be read is reported once, where it failed.
+      if (!reportedUnreadable.has(at)) { reportedUnreadable.add(at); unreadable(at, node); }
+      return 'UNREADABLE';
+    }
+    if (node && sha256(node.bytes) !== input.sha256) return 'ALTERED';
+    if (registered.get(input.path)?.record.sha256 === input.sha256) return 'OK';
+    if (unknown.has(input.path) && (unknown.get(input.path) === null || unknown.get(input.path) === input.sha256)) return 'UNREADABLE';
+    return 'MISSING';
   };
   const deps = new Map(); // path → [{input, state}]
   for (const [path, a] of registered) {
@@ -310,69 +371,63 @@ export function evaluate(tree) {
   const edges = (path) => deps.get(path).filter((d) => d.state === 'OK').map((d) => d.input.path);
   const scc = stronglyConnected([...registered.keys()].sort(compare), edges);
 
-  // Process components sinks first (Tarjan's emission order), so every non-cyclic input is decided before use.
+  // Components sinks first (Tarjan's emission order), so every non-cyclic input is decided before it is used.
   const stale = new Map();
+  const upToDate = new Map();
   for (const component of scc.components) {
     for (const path of component) {
       const a = registered.get(path);
       const reasons = [];
       for (const { input, state } of deps.get(path)) {
-        if (state === 'ALTERED') { reasons.push({ code: 'INPUT-ALTERED', input: input.path }); continue; }
-        if (state === 'MISSING') { reasons.push({ code: 'INPUT-MISSING', input: input.path }); continue; }
+        if (state !== 'OK') { reasons.push({ code: `INPUT-${state}`, input: input.path }); continue; }
         const inputStage = registered.get(input.path).stage;
         if (inputStage !== 'source') {
           const s = stageState.get(inputStage);
           if (UNSETTLED.has(s.status)) reasons.push({ code: 'UPSTREAM-UNSETTLED', input: input.path });
+          else if (s.status === 'unevaluable') reasons.push({ code: 'UPSTREAM-UNEVALUABLE', input: input.path });
           else if (!s.current.has(input.path) && inputStage !== a.stage) reasons.push({ code: 'INPUT-SUPERSEDED', input: input.path });
         }
         if (scc.index.get(input.path) === scc.index.get(path)) reasons.push({ code: 'CYCLE', input: input.path });
-        else if (stale.get(input.path).length > 0) reasons.push({ code: 'UPSTREAM-OUT-OF-DATE', input: input.path });
+        else if (upToDate.get(input.path) === false) reasons.push({ code: 'UPSTREAM-OUT-OF-DATE', input: input.path });
+        else if (upToDate.get(input.path) === null) reasons.push({ code: 'UPSTREAM-UNEVALUABLE', input: input.path });
       }
       for (const input of a.record.inputs.filter((i) => Object.hasOwn(i, 'collection'))) {
         const key = (m) => `${m.path} ${m.sha256}`;
-        const cited = new Set(input.members.map(key));
+        const known = (m) => !sourceUnknown.includes(m.path);
+        const cited = new Set(input.members.filter(known).map(key));
         const current = new Set(sourceMembers.map(key));
         const added = sourceMembers.filter((m) => !cited.has(key(m)));
-        const removed = input.members.filter((m) => !current.has(key(m))).map((m) => ({ path: m.path, sha256: m.sha256 }));
+        const removed = input.members.filter((m) => known(m) && !current.has(key(m))).map((m) => ({ path: m.path, sha256: m.sha256 }));
         if (added.length || removed.length) reasons.push({ code: 'SOURCE-CHANGED', input: 'source', added, removed });
+        if (folderUnreadable.has('source')) reasons.push({ code: 'INPUT-UNREADABLE', input: 'source' });
+        for (const p of sourceUnknown) reasons.push({ code: 'INPUT-UNREADABLE', input: p });
       }
-      reasons.sort((x, y) => compare(x.input, y.input) || compare(x.code, y.code));
-      stale.set(path, reasons);
+      const sorted = unique(reasons).sort(byInputThenCode);
+      stale.set(path, sorted);
+      upToDate.set(path, verdict(sorted));
     }
   }
 
-  // R-E5.7: out-of-date or ok, now that freshness is known.
-  for (const [, s] of stageState) {
-    if (s.status === 'settled') s.status = s.headCurrent.some((p) => stale.get(p).length > 0) ? 'out-of-date' : 'ok';
+  // R-E5.7: out-of-date or ok, now that freshness is known. Unknown freshness alone does not make a stage out of date.
+  for (const [stage, s] of stageState) {
+    if (stage !== 'source' && s.status === 'settled') s.status = s.headCurrent.some((p) => upToDate.get(p) === false) ? 'out-of-date' : 'ok';
   }
 
-  // R-E7 and R-E9, per registered artifact.
+  // R-E9 and the report entry, per registered artifact.
   const artifacts = [...registered.keys()].sort(compare).map((path) => {
     const a = registered.get(path);
-    const upToDate = stale.get(path).length === 0;
-    const inStageCurrent = stageState.get(a.stage).current.has(path);
+    const s = stageState.get(a.stage);
     const historyBecause = [];
     for (const input of a.record.inputs.filter((i) => i.relation === 'history')) {
       const state = resolution(input);
-      if (state === 'ALTERED') historyBecause.push({ code: 'HISTORY-ALTERED', input: input.path });
-      else if (state === 'MISSING') historyBecause.push({ code: 'HISTORY-MISSING', input: input.path });
+      if (state !== 'OK') historyBecause.push({ code: `HISTORY-${state}`, input: input.path });
     }
-    historyBecause.sort((x, y) => compare(x.input, y.input) || compare(x.code, y.code));
-    let pipelineReady = null;
-    const notReadyBecause = [];
-    if (a.stage !== 'source') {
-      if (!upToDate) notReadyBecause.push('OUT-OF-DATE');
-      if (!inStageCurrent) notReadyBecause.push('NOT-CURRENT');
-      if (a.stage !== 'normalized') {
-        const roots = structuralRoots(path, edges, (p) => registered.get(p).stage === 'normalized');
-        if (roots.size === 0) notReadyBecause.push('NO-STRUCTURAL-ROOT');
-        else if (roots.size > 1) notReadyBecause.push('STRUCTURAL-ROOT-MISMATCH');
-      }
-      pipelineReady = notReadyBecause.length === 0;
-    }
+    const history = unique(historyBecause).sort(byInputThenCode);
     return {
-      path, sha256: a.record.sha256, stage: a.stage, inStageCurrent, upToDate, staleBecause: stale.get(path),
-      historyVerified: historyBecause.length === 0, historyBecause, pipelineReady, notReadyBecause,
+      path, sha256: a.record.sha256, stage: a.stage,
+      inStageCurrent: a.stage === 'source' ? true : s.status === 'unevaluable' ? null : s.current.has(path),
+      upToDate: upToDate.get(path), staleBecause: stale.get(path),
+      historyVerified: verdict(history), historyBecause: history,
     };
   });
 
@@ -420,18 +475,4 @@ function stronglyConnected(nodes, edges) {
     }
   }
   return { components, index: componentOf };
-}
-
-/** R-E7: the normalized artifacts reached from `start` along dependency edges, stopping at each of them. */
-function structuralRoots(start, edges, isRoot) {
-  const roots = new Set(), seen = new Set([start]), queue = [start];
-  while (queue.length) {
-    for (const next of edges(queue.shift())) {
-      if (seen.has(next)) continue;
-      seen.add(next);
-      if (isRoot(next)) roots.add(next);
-      else queue.push(next);
-    }
-  }
-  return roots;
 }

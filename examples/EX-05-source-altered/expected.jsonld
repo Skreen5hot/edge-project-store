@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000005",
   "valid": true,
   "stages": {
@@ -13,7 +13,7 @@
     "normalized": {
       "status": "out-of-date",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-1a89ff092b4ca5acc616ee54d8de7c9de04cc20fdac8b17fec650bb23943b674.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-ab6ee31580a199bb14c939b15f79b2720ba69c87e53b2409850dfa69646f1ff5.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -22,7 +22,7 @@
     "sdd": {
       "status": "out-of-date",
       "heads": [
-        "sdd/revisions/rev-20261101T100001Z-11142fd8be76dfccb386ff04531dc748ec1166e5835238c3f9f57d2abd3c04f0.jsonld"
+        "sdd/revisions/rev-20261101T100001Z-491bdce0118ac83a63d4530b2729d457024926b6310a76dee29e980657dd8cee.jsonld"
       ],
       "current": [
         "sdd/sdd-20261101T100000Z-fa7eae25.jsonld"
@@ -70,11 +70,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE"
-      ]
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
@@ -89,11 +85,7 @@
         }
       ],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "OUT-OF-DATE"
-      ]
+      "historyBecause": []
     }
   ],
   "diagnostics": [

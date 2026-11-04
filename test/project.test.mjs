@@ -97,7 +97,8 @@ test('writing EX-02 through the API reproduces the fixture byte for byte', async
   }
   const r = await sdd.evaluate();
   assert.deepEqual(codes(r), []);
-  assert.equal(r.artifacts.find((a) => a.stage === 'sdd').pipelineReady, true);
+  const sddArtifact = r.artifacts.find((a) => a.stage === 'sdd');
+  assert.deepEqual([sddArtifact.inStageCurrent, sddArtifact.upToDate], [true, true]);
 });
 
 test('createProject refuses an existing project; openProject refuses a folder that is not one', async () => {
@@ -345,9 +346,9 @@ test('a history input is recorded with its hash and does not affect freshness', 
     inputs: [structure, { role: 'previous', relation: 'history', path: first.artifacts[0].path }] }], createdAt: '2026-11-01T11:00:00Z' });
   const r = await sdd.evaluate();
   const current = r.artifacts.find((a) => a.path === r.stages.sdd.current[0]);
-  assert.deepEqual([current.upToDate, current.historyVerified, current.pipelineReady], [true, true, true]);
+  assert.deepEqual([current.upToDate, current.historyVerified, current.inStageCurrent], [true, true, true]);
   const old = r.artifacts.find((a) => a.path === first.artifacts[0].path);
-  assert.deepEqual(old.notReadyBecause, ['NOT-CURRENT']);
+  assert.deepEqual([old.inStageCurrent, old.upToDate], [false, true]);
 });
 
 // A backend on which another writer commits to `stage` right after the first listing of its revisions/ returns:

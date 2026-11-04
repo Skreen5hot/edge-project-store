@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'examples');
-const CTX = 'https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld';
+const CTX = 'https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld';
 const STAGES = ['source', 'normalized', 'sdd', 'rml', 'rdf', 'graph', 'diagrams'];
 
 const enc = new TextEncoder();
@@ -41,7 +41,7 @@ class Project {
     this.files = new Map(); // project-relative path -> Uint8Array
     this.id = `urn:uuid:00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
     this.put('edge-project.jsonld', canonical({
-      '@context': CTX, '@id': this.id, '@type': 'EdgeProject', contractVersion: 1, name,
+      '@context': CTX, '@id': this.id, '@type': 'EdgeProject', contractVersion: 2, name,
       createdAt: '2026-11-01T08:00:00Z',
     }));
   }
@@ -57,7 +57,7 @@ class Project {
     const path = `${stage}/${kind}-${t.name}-${hash.slice(0, prefix)}.${ext}`;
     this.put(path, bytes);
     this.put(`${path}.record.jsonld`, canonical({
-      '@context': CTX, '@type': 'ArtifactRecord', contractVersion: 1, project: this.id, stage, path, kind,
+      '@context': CTX, '@type': 'ArtifactRecord', contractVersion: 2, project: this.id, stage, path, kind,
       sha256: hash, bytes: bytes.length,
       generation: generation ?? (stage === 'source' ? 'received' : by === 'sdd' ? 'assisted' : 'deterministic'),
       producedBy: BY[by], inputs, createdAt: t.at,
@@ -69,7 +69,7 @@ class Project {
   revision(by, hhmmss, parents, current, { stage = STAGE_OF[by] } = {}) {
     const t = time(hhmmss);
     const bytes = canonical({
-      '@context': CTX, '@type': 'StageRevision', contractVersion: 1, project: this.id, stage,
+      '@context': CTX, '@type': 'StageRevision', contractVersion: 2, project: this.id, stage,
       parents: parents.map((r) => r.sha256).sort(),
       current: current.map(([role, a]) => ({ role, path: a.path, sha256: a.sha256 })) // entries cite the full hash
         .sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0)),
@@ -111,7 +111,7 @@ function report(p, { stages = {}, artifacts = [], diagnostics = [] } = {}) {
   const st = {};
   for (const s of STAGES) st[s] = stages[s] ?? { status: 'empty', heads: [], current: [] };
   return {
-    '@context': CTX, '@type': 'ProjectReport', contractVersion: 1, project: p.id, valid: true, stages: st,
+    '@context': CTX, '@type': 'ProjectReport', contractVersion: 2, project: p.id, valid: true, stages: st,
     artifacts: [...artifacts].sort((a, b) => (a.path < b.path ? -1 : 1)),
     diagnostics: [...diagnostics].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.code < b.code ? -1 : 1)),
   };
@@ -119,13 +119,13 @@ function report(p, { stages = {}, artifacts = [], diagnostics = [] } = {}) {
 const stage = (status, heads = [], current = []) => ({
   status, heads: heads.map((r) => r.path).sort(), current: current.map((a) => a.path).sort(),
 });
-function art(a, { cur, up = true, stale = [], histOk = true, histWhy = [], ready, notReady = [] }) {
+function art(a, { cur, up = true, stale = [], histOk = true, histWhy = [] }) {
   return {
     path: a.path, sha256: a.sha256, stage: a.path.split('/')[0], inStageCurrent: cur, upToDate: up,
-    staleBecause: stale, historyVerified: histOk, historyBecause: histWhy, pipelineReady: ready, notReadyBecause: notReady,
+    staleBecause: stale, historyVerified: histOk, historyBecause: histWhy,
   };
 }
-const src = (a) => art(a, { cur: true, ready: null });
+const src = (a) => art(a, { cur: true });
 const why = (code, input, extra = {}) => ({ code, input: typeof input === 'string' ? input : input.path, ...extra });
 const diag = (code, path) => ({ code, path: typeof path === 'string' ? path : path.path });
 
@@ -144,11 +144,11 @@ function chain(p) {
 const EXAMPLES = [
   ['01-empty-project', 'A project with no stages yet.', 'R-P2, R-E4, R-E5.7', (p) => report(p)],
 
-  ['02-chain-ok', 'Source → normalized → SDD, all current; the SDD is pipeline-ready.', 'R-E3–R-E8', (p) => {
+  ['02-chain-ok', 'Source → normalized → SDD, all current and up to date.', 'R-E3–R-E6, R-E8', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: true })],
     });
   }],
 
@@ -159,8 +159,8 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1, s2]), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1), src(s2),
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [member(s2)], removed: [] })], ready: false, notReady: ['OUT-OF-DATE'] }),
-        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [member(s2)], removed: [] })] }),
+        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)] }),
       ],
     });
   }],
@@ -177,8 +177,8 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s2)] })], ready: false, notReady: ['OUT-OF-DATE'] }),
-        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s2)] })] }),
+        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)] }),
       ],
     });
   }],
@@ -189,14 +189,14 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('empty'), normalized: stage('out-of-date', [rN1], [n1]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
-        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s1)] })], ready: false, notReady: ['OUT-OF-DATE'] }),
-        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: true, up: false, stale: [why('SOURCE-CHANGED', 'source', { added: [], removed: [member(s1)] })] }),
+        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', n1)] }),
       ],
       diagnostics: [diag('E-INTEGRITY', s1)],
     });
   }],
 
-  ['06-normalized-superseded', 'A new normalized schema is committed; the SDD built on the old one is out of date.', 'R-E5.8, R-E6 (INPUT-SUPERSEDED), R-E7 (NOT-CURRENT)', (p) => {
+  ['06-normalized-superseded', 'A new normalized schema is committed; the SDD built on the old one is out of date.', 'R-E5.8, R-E6 (INPUT-SUPERSEDED)', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
     const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
@@ -204,20 +204,20 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n2, { cur: true, ready: true }),
-        art(d1, { cur: true, up: false, stale: [why('INPUT-SUPERSEDED', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: false }),
+        art(n2, { cur: true }),
+        art(d1, { cur: true, up: false, stale: [why('INPUT-SUPERSEDED', n1)] }),
       ],
     });
   }],
 
-  ['07-sdd-provisional', 'An SDD built straight from a source schema: up to date, but not pipeline-ready.', 'R-E7 (NO-STRUCTURAL-ROOT)', (p) => {
+  ['07-sdd-from-source', 'An SDD built straight from a source schema: the contract does not judge which stage an input comes from, so the SDD is current and up to date.', 'R-P4, R-E6', (p) => {
     const s1 = p.artifact('intake', 'schema', 'json', '090000', '{"objectTypes":["Organization","Site"]}\n');
     const d1 = p.artifact('sdd', 'sdd', 'jsonld', '100000', '{"sdd":1,"structure":"source"}\n', { inputs: [use('structure', s1)] });
     const rD1 = p.revision('sdd', '100001', [], [['sdd', d1]]);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(d1, { cur: true, ready: false, notReady: ['NO-STRUCTURAL-ROOT'] })],
+      artifacts: [src(s1), art(d1, { cur: true })],
     });
   }],
 
@@ -230,10 +230,10 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('conflicted', [rA, rB]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }),
-        art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d2, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d3, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        src(s1), art(n1, { cur: true }),
+        art(d1, { cur: false }),
+        art(d2, { cur: false }),
+        art(d3, { cur: false }),
       ],
       diagnostics: [diag('E-STAGE-CONFLICT', 'sdd')],
     });
@@ -249,10 +249,10 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rM], [d3]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }),
-        art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d2, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d3, { cur: true, ready: true }),
+        src(s1), art(n1, { cur: true }),
+        art(d1, { cur: false }),
+        art(d2, { cur: false }),
+        art(d3, { cur: true }),
       ],
     });
   }],
@@ -268,8 +268,8 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true }),
-        art(d2, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        src(s1), art(n1, { cur: true }), art(d1, { cur: true }),
+        art(d2, { cur: false }),
       ],
       diagnostics: [diag('W-TEMP-FILE', 'sdd/.eps-tmp-7d3f0a'), diag('W-INTERRUPTED-REVISION', intended), diag('W-UNCOMMITTED', d2)],
     });
@@ -280,7 +280,7 @@ const EXAMPLES = [
     p.put(d1.path, '{"sdd":1,"structure":"normalized-1","edited":true}\n');
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('damaged', [rD1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true })],
       diagnostics: [diag('E-CURRENT-UNRESOLVED', rD1), diag('E-INTEGRITY', d1)],
     });
   }],
@@ -293,9 +293,9 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('incomplete', [rD2]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }),
-        art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d2, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        src(s1), art(n1, { cur: true }),
+        art(d1, { cur: false }),
+        art(d2, { cur: false }),
       ],
       diagnostics: [diag('E-MISSING-PARENT', rD2), diag('W-UNCOMMITTED', d1)],
     });
@@ -307,7 +307,7 @@ const EXAMPLES = [
     doc['@context'] = 'https://example.org/ctx.jsonld';
     p.put('edge-project.jsonld', canonical(doc));
     return {
-      '@context': CTX, '@type': 'ProjectReport', contractVersion: 1, project: null, valid: false, stages: {},
+      '@context': CTX, '@type': 'ProjectReport', contractVersion: 2, project: null, valid: false, stages: {},
       artifacts: [], diagnostics: [diag('E-CTX-EXTERNAL', 'edge-project.jsonld')],
     };
   }],
@@ -322,7 +322,7 @@ const EXAMPLES = [
     p.put(loosePath, loose);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: true })],
       diagnostics: [diag('W-FOREIGN-FILE', copy), diag('W-FOREIGN-FILE', 'source/notes.txt'), diag('W-UNREGISTERED', loosePath)],
     });
   }],
@@ -332,7 +332,7 @@ const EXAMPLES = [
     const bad = p.revision('normalizer', '120001', [rD1], [['sdd', d1]], { stage: 'sdd' });
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('damaged', [rD1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: false })],
       diagnostics: [diag('E-WRONG-RESPONSIBILITY', bad)],
     });
   }],
@@ -344,12 +344,12 @@ const EXAMPLES = [
       { inputs: [use('model', d1), { role: 'notes', relation: 'dependency', path: 'sdd/work/session.json', sha256: sha256(p.files.get('sdd/work/session.json')) }] });
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: true })],
       diagnostics: [diag('E-WORK-INPUT', g1.record)],
     });
   }],
 
-  ['17-structural-root-mismatch', 'A diagram combining an SDD and a different normalized schema.', 'R-E7 (STRUCTURAL-ROOT-MISMATCH)', (p) => {
+  ['17-two-normalized-inputs', 'A diagram combining an SDD and a different normalized schema: two ordinary inputs, and the diagram is up to date.', 'R-P4, R-E6', (p) => {
     const s1 = p.artifact('intake', 'schema', 'json', '090000', '{"objectTypes":["Organization","Site"]}\n');
     const s2 = p.artifact('intake', 'schema', 'json', '090500', '{"objectTypes":["Asset"]}\n');
     const n1 = p.artifact('normalizer', 'normalized', 'json', '091000', '{"normalized":1,"types":["Organization","Site"]}\n', { inputs: [use('source', s1)] });
@@ -362,9 +362,9 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1, s2]), normalized: stage('ok', [rN1], [n1, n2]), sdd: stage('ok', [rD1], [d1]), diagrams: stage('ok', [rG1], [g1]) },
       artifacts: [
-        src(s1), src(s2), art(n1, { cur: true, ready: true }), art(n2, { cur: true, ready: true }),
-        art(d1, { cur: true, ready: true }),
-        art(g1, { cur: true, ready: false, notReady: ['STRUCTURAL-ROOT-MISMATCH'] }),
+        src(s1), src(s2), art(n1, { cur: true }), art(n2, { cur: true }),
+        art(d1, { cur: true }),
+        art(g1, { cur: true }),
       ],
     });
   }],
@@ -379,16 +379,16 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('conflicted', [rA, rB]), sdd: stage('out-of-date', [rD1], [d1]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n2, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n3, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-UNSETTLED', n1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        art(n1, { cur: false }),
+        art(n2, { cur: false }),
+        art(n3, { cur: false }),
+        art(d1, { cur: true, up: false, stale: [why('UPSTREAM-UNSETTLED', n1)] }),
       ],
       diagnostics: [diag('E-STAGE-CONFLICT', 'normalized')],
     });
   }],
 
-  ['19-sdd-rerun', 'An SDD rerun on a new normalized schema, citing the previous SDD as history: the new SDD is ready.', 'R-P4 (relation: history), R-E7, R-E9', (p) => {
+  ['19-sdd-rerun', 'An SDD rerun on a new normalized schema, citing the previous SDD as history: the new SDD is current and up to date.', 'R-P4 (relation: history), R-E9', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
     const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
@@ -398,15 +398,15 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('ok', [rD2], [d2]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n2, { cur: true, ready: true }),
-        art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)], ready: false, notReady: ['OUT-OF-DATE', 'NOT-CURRENT'] }),
-        art(d2, { cur: true, ready: true }),
+        art(n1, { cur: false }),
+        art(n2, { cur: true }),
+        art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)] }),
+        art(d2, { cur: true }),
       ],
     });
   }],
 
-  ['20-same-stage-dependency', 'The same rerun as EX-19, but the new SDD declares the previous SDD a dependency: staleness and the old structural root follow it.', 'R-P4 (relation: dependency), R-E6, R-E7 (STRUCTURAL-ROOT-MISMATCH)', (p) => {
+  ['20-same-stage-dependency', 'The same rerun as EX-19, but the new SDD declares the previous SDD a dependency: the staleness of the old SDD follows it.', 'R-P4 (relation: dependency), R-E6', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     const n2 = p.artifact('normalizer', 'normalized', 'json', '120000', '{"normalized":2,"types":["Organization","Site"]}\n', { inputs: [sources(s1)] });
     const rN2 = p.revision('normalizer', '120001', [rN1], [['normalized', n2]]);
@@ -416,10 +416,10 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('out-of-date', [rD2], [d2]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n2, { cur: true, ready: true }),
-        art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)], ready: false, notReady: ['OUT-OF-DATE', 'NOT-CURRENT'] }),
-        art(d2, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', d1)], ready: false, notReady: ['OUT-OF-DATE', 'STRUCTURAL-ROOT-MISMATCH'] }),
+        art(n1, { cur: false }),
+        art(n2, { cur: true }),
+        art(d1, { cur: false, up: false, stale: [why('INPUT-SUPERSEDED', n1)] }),
+        art(d2, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', d1)] }),
       ],
     });
   }],
@@ -435,9 +435,9 @@ const EXAMPLES = [
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN2], [n2]), sdd: stage('ok', [rD2], [d2]) },
       artifacts: [
         src(s1),
-        art(n1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(n2, { cur: true, ready: true }),
-        art(d2, { cur: true, histOk: false, histWhy: [why('HISTORY-ALTERED', d1)], ready: true }),
+        art(n1, { cur: false }),
+        art(n2, { cur: true }),
+        art(d2, { cur: true, histOk: false, histWhy: [why('HISTORY-ALTERED', d1)] }),
       ],
       diagnostics: [diag('E-INTEGRITY', d1)],
     });
@@ -453,7 +453,7 @@ const EXAMPLES = [
     const rD1 = p.revision('sdd', '100001', [], [['sdd', d1]]);
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: true })],
       diagnostics: [diag('W-UNREGISTERED', stray)],
     });
   }],
@@ -466,12 +466,12 @@ const EXAMPLES = [
       { inputs: [{ role: 'model', relation: 'dependency', path, sha256: d1.sha256 }] }));
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]) },
-      artifacts: [src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true })],
+      artifacts: [src(s1), art(n1, { cur: true }), art(d1, { cur: true })],
       diagnostics: bad.map((g) => diag('E-PATH-UNSAFE', g.record)),
     });
   }],
 
-  ['24-dependency-cycle', 'Two diagrams depend on each other, and a third depends on one of them: CYCLE on the cycle, UPSTREAM-OUT-OF-DATE outside it.', 'R-E6 (cycles), R-E7', (p) => {
+  ['24-dependency-cycle', 'Two diagrams depend on each other, and a third depends on one of them: CYCLE on the cycle, UPSTREAM-OUT-OF-DATE outside it.', 'R-E6 (cycles)', (p) => {
     const { s1, n1, rN1, d1, rD1 } = chain(p);
     const c1 = 'classDiagram\n  %% g1\n', c2 = 'classDiagram\n  %% g2\n';
     const g1ref = planned('diagrams', 'diagram', 'mmd', '110000', c1);
@@ -483,10 +483,10 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('ok', [rD1], [d1]), diagrams: stage('out-of-date', [rG], [g1, g2, g3]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }), art(d1, { cur: true, ready: true }),
-        art(g1, { cur: true, up: false, stale: [why('CYCLE', g2)], ready: false, notReady: ['OUT-OF-DATE'] }),
-        art(g2, { cur: true, up: false, stale: [why('CYCLE', g1)], ready: false, notReady: ['OUT-OF-DATE'] }),
-        art(g3, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', g1)], ready: false, notReady: ['OUT-OF-DATE'] }),
+        src(s1), art(n1, { cur: true }), art(d1, { cur: true }),
+        art(g1, { cur: true, up: false, stale: [why('CYCLE', g2)] }),
+        art(g2, { cur: true, up: false, stale: [why('CYCLE', g1)] }),
+        art(g3, { cur: true, up: false, stale: [why('UPSTREAM-OUT-OF-DATE', g1)] }),
       ],
     });
   }],
@@ -510,9 +510,9 @@ const EXAMPLES = [
     return report(p, {
       stages: { source: stage('ok', [], [s1]), normalized: stage('ok', [rN1], [n1]), sdd: stage('conflicted', [rA, rB]) },
       artifacts: [
-        src(s1), art(n1, { cur: true, ready: true }),
-        art(d1, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
-        art(dA, { cur: false, ready: false, notReady: ['NOT-CURRENT'] }),
+        src(s1), art(n1, { cur: true }),
+        art(d1, { cur: false }),
+        art(dA, { cur: false }),
       ],
       diagnostics: [diag('E-STAGE-CONFLICT', 'sdd'), diag('W-FOREIGN-FILE', copyArtifact), diag('W-FOREIGN-FILE', copyRecord)],
     });

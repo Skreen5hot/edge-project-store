@@ -90,7 +90,7 @@ test('M1-2: auto mode uses hard links where the file system has them; the code n
   const source = readFileSync(join(here, '..', 'src', 'node-backend.mjs'), 'utf8');
   const renames = source.split('\n').filter((l) => /fsp\.rename\(/.test(l));
   assert.equal(renames.length, 1, 'one rename, in replace()');
-  assert.match(source.slice(source.indexOf('async replace('), source.indexOf('async replace(') + 600), /fsp\.rename\(temp, full\(path\)\)/);
+  assert.match(source.slice(source.indexOf('async replace('), source.indexOf('async replace(') + 1500), /fsp\.rename\(temp, full\(path\)\)/);
 });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -155,7 +155,7 @@ test('M1-5: a junction in a project is foreign, an input through it is missing, 
   const hash = sha256(diagram);
   const name = `diagram-20261101T110000Z-${hash.slice(0, 8)}.mmd`;
   const record = {
-    '@context': 'https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld', '@type': 'ArtifactRecord', contractVersion: 1,
+    '@context': 'https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld', '@type': 'ArtifactRecord', contractVersion: 2,
     project: PROJECT, stage: 'diagrams', path: `diagrams/${name}`, kind: 'diagram', sha256: hash, bytes: diagram.length,
     generation: 'deterministic', producedBy: { responsibility: 'diagram-exporter', tool: 'test', version: '1' },
     inputs: [{ role: 'model', relation: 'dependency', path: `sdd/linked/${normalizedName}`, sha256: sha256(target) }], createdAt: '2026-11-01T11:00:00Z',
@@ -264,7 +264,7 @@ test('M1-8: eps init, add-source, commit, a fork, a refused commit, and merge', 
   assert.equal((await cli('merge', pc1, 'sdd', '--choose', `sdd=sdd/${chosen}`)).code, 0);
   const after = await cli('status', pc1);
   assert.equal(after.code, 0, after.stdout);
-  assert.match(after.stdout, new RegExp(`sdd/${chosen}\\s+\\[pipeline-ready\\]`));
+  assert.match(after.stdout, new RegExp(`sdd/${chosen}\\s+\\[up to date\\]`));
 });
 
 test('M1-8: usage errors exit 2 with a message', async () => {

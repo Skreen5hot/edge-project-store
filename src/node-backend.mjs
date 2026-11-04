@@ -16,11 +16,17 @@ import { TEMP_PREFIX } from './contract.mjs';
 
 const LINK_UNSUPPORTED = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS', 'EINVAL', 'EMLINK']);
 const STALE_TEMP_MS = 60 * 60 * 1000;
+// Windows refuses a rename onto a file another process holds open (OneDrive uploading, antivirus scanning) for a
+// moment: replace() retries those codes a few times, 50 ms doubling, about 1.5 s in all.
+const REPLACE_RETRYABLE = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const REPLACE_RETRIES = 5;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const fail = (code, message) => Object.assign(new Error(message), { code });
 
 /**
  * `root` is the project folder. Options: `mode` 'auto' (link, else wx), 'link' or 'wx', for tests;
- * `hooks.beforeCreate(path, bytes)` as in the memory backend.
+ * `hooks.beforeCreate(path, bytes)` as in the memory backend; `hooks.beforeRename(path, attempt)` runs before each
+ * rename in replace() and may throw, to simulate a locked file.
  */
 export function nodeBackend(root, { mode = 'auto', hooks = {} } = {}) {
   const segments = (path) => (path === '' ? [] : path.split('/'));
@@ -133,11 +139,18 @@ export function nodeBackend(root, { mode = 'auto', hooks = {} } = {}) {
       if (existing && !existing.isFile()) throw fail('NOT-A-FILE', `not a file: ${path}`);
       const temp = join(dir, tempName());
       await writeAndSync(temp, bytes, 'wx');
-      try {
-        await fsp.rename(temp, full(path));
-      } catch (e) {
-        await fsp.unlink(temp).catch(() => {});
-        throw e;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          if (hooks.beforeRename) await hooks.beforeRename(path, attempt);
+          await fsp.rename(temp, full(path));
+          return;
+        } catch (e) {
+          if (!REPLACE_RETRYABLE.has(e.code) || attempt >= REPLACE_RETRIES) {
+            await fsp.unlink(temp).catch(() => {});
+            throw e;
+          }
+          await sleep(50 * 2 ** attempt);
+        }
       }
     },
   };

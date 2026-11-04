@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.1 **frozen** (2026-11-03), after the registrar's final confirmation review. Slice 1 of [`../PROPOSAL.md`](../PROPOSAL.md). Any change to the rules, schemas or expected reports is a new contract version. |
+| **Status** | v0.2 (2026-11-04), by the registrar's decision on [`../proposals/2026-11-04-eps-v0.2.md`](../proposals/2026-11-04-eps-v0.2.md): the contract governs project structure and document management, not pipeline process. It supersedes v0.1, frozen on 2026-11-03 and kept at the tag `eps-v0.1`. Any change to the rules, schemas or expected reports is a new contract version. |
 | **Registrar** | Aaron Damiano. |
 | **Normative language** | BCP 14 keywords (MUST, MUST NOT, SHOULD, MAY) per RFC 2119 / RFC 8174, uppercase only. |
 | **Identifiers** | Rules R-B\* (bytes and names), R-P\* (project files), R-E\* (evaluation), R-W\* (writers); diagnostics E-\* (errors) and W-\* (warnings); examples EX-\*. Minted, never renumbered. |
@@ -12,8 +12,10 @@
 → Semantic Data Dictionary → RML → RDF → graph, with Mermaid diagrams as a derived view) shares work through one
 folder the user picks. This contract fixes that folder's layout and its three kinds of metadata file, and defines
 one pure evaluation that any tool can run to learn, from the files alone: which artifacts are current, which are out
-of date and why, whether anything is damaged or in conflict, and which artifacts are ready for the next stage of the
-pipeline. Nothing here needs a server, a database, a lock service or a network.
+of date and why, whether anything is damaged or in conflict, and what could not be evaluated because a file could
+not be read. It governs how a project is kept, not how a pipeline is run: which stage's output a tool takes as its
+input is for the tool and the people using it. Nothing here needs a server, a database, a lock service or a
+network.
 
 ---
 
@@ -43,17 +45,21 @@ A stage folder that does not exist is an empty stage. Folders and files at the p
 `edge-project.jsonld` and the registry's stage folders are ignored without a diagnostic, so later contract versions
 can add stages and users can keep their own notes beside the project.
 
-## 3. Stage registry (v0.1)
+## 3. Stage registry
 
-| Stage (folder) | Responsibility (single writer) | Structural root required for pipeline readiness (R-E7) |
-|---|---|---|
-| `source` | `intake`: **shared**, any tool (R-W7) | not applicable |
-| `normalized` | `normalizer` | not applicable (it is the structural root) |
-| `sdd` | `sdd-author` | yes |
-| `rml` | `rml-generator` | yes |
-| `rdf` | `rdf-generator` | yes |
-| `graph` | `graph-loader` | yes |
-| `diagrams` | `diagram-exporter` | yes |
+| Stage (folder) | Responsibility (single writer) |
+|---|---|
+| `source` | `intake`: **shared**, any tool (R-W7) |
+| `normalized` | `normalizer` |
+| `sdd` | `sdd-author` |
+| `rml` | `rml-generator` |
+| `rdf` | `rdf-generator` |
+| `graph` | `graph-loader` |
+| `diagrams` | `diagram-exporter` |
+
+The registry fixes the folders and who writes each. It does **not** prescribe which stage feeds which: a record may
+cite any registered artifact as an input, in any stage, and the evaluation does not judge that choice (for example
+an SDD built straight from a source schema, EX-07).
 
 A **responsibility** is a role, not a program: one tool MAY host several responsibilities (for example, an SDD tool
 that also exports diagrams writes `diagrams/` as `diagram-exporter`). Every record and revision names its
@@ -108,17 +114,18 @@ responsibility, the tool and the tool version (R-P4, R-P5).
 ## 5. Project files
 
 - **R-P1: Context.** Every metadata file has `"@context":
-  "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld"`, exactly that string. Readers resolve it
-  from their bundled copy of [`../context/eps-v1.jsonld`](../context/eps-v1.jsonld) and MUST NOT dereference it. Any
+  "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld"`, exactly that string. Readers resolve it
+  from their bundled copy of [`../context/eps-v2.jsonld`](../context/eps-v2.jsonld) and MUST NOT dereference it. Any
   other `@context` makes the file invalid with **E-CTX-EXTERNAL**. A new context version is a new IRI.
 - **R-P2: `edge-project.jsonld`.** Shape:
-  [`../schemas/edge-project-v1.schema.json`](../schemas/edge-project-v1.schema.json). `@id` is the project's
+  [`../schemas/edge-project-v2.schema.json`](../schemas/edge-project-v2.schema.json). `@id` is the project's
   identity, a `urn:uuid:` IRI created once; `name` is a label. The file is never modified (R-W1); renaming a project
-  is out of scope in v0.1. A folder without this file is not a project (**E-NOT-A-PROJECT**).
-- **R-P3: Contract version.** Every metadata file carries `contractVersion: 1`. A file with any other value is
-  invalid; for `edge-project.jsonld` the diagnostic is **E-UNSUPPORTED-VERSION**.
+  is out of scope. A folder without this file is not a project (**E-NOT-A-PROJECT**).
+- **R-P3: Contract version.** Every metadata file carries `contractVersion: 2`. A file with any other value is
+  invalid; for `edge-project.jsonld` the diagnostic is **E-UNSUPPORTED-VERSION**. Files written under v0.1
+  (`contractVersion: 1`) are therefore not read by a v0.2 reader; no v0.1 project exists outside this repository.
 - **R-P4: Artifact records.** Each artifact has one record, `<artifact file name>.record.jsonld`, beside it. Shape:
-  [`../schemas/artifact-record-v1.schema.json`](../schemas/artifact-record-v1.schema.json). A record is valid only
+  [`../schemas/artifact-record-v2.schema.json`](../schemas/artifact-record-v2.schema.json). A record is valid only
   if, in this order (the first failure is the one reported):
   1. it parses as JSON (else **E-RECORD-INVALID**);
   2. R-P1 holds (else **E-CTX-EXTERNAL**);
@@ -139,16 +146,15 @@ responsibility, the tool and the tool version (R-P4, R-P5).
   `work/` folder.
 
   Each **artifact input** `{role, relation, path, sha256}` declares its **relation** explicitly:
-  - `dependency`: the artifact was produced using the input's content. Freshness and structural roots follow it
-    (R-E6, R-E7).
+  - `dependency`: the artifact was produced using the input's content. Freshness follows it (R-E6).
   - `history`: the input is an earlier artifact that this one supersedes or continues, cited as provenance. It is
-    verified for identity and integrity, but it does not take part in freshness or structural roots (R-E9).
+    verified for identity and integrity, but it does not take part in freshness (R-E9).
 
   No relation is implied by where the input lies. A same-stage input is a dependency unless its record says
   `history`. The **collection input** `{role, relation: "dependency", collection: "source", members}` lists the
   source files used, as `{path, sha256}` pairs, so a record names the exact file behind each hash.
 - **R-P5: Stage revisions.** A stage's state is a set of revision files in `<stage>/revisions/`, never one mutable
-  file. Shape: [`../schemas/stage-revision-v1.schema.json`](../schemas/stage-revision-v1.schema.json). A revision's
+  file. Shape: [`../schemas/stage-revision-v2.schema.json`](../schemas/stage-revision-v2.schema.json). A revision's
   identity is its own `sha256`. `parents` lists the identities of the revisions it follows, sorted ascending; `[]`
   for a stage's first revision. `current` lists the artifacts this revision makes current. A revision is
   **well-formed** if, in this order: it parses as JSON; R-P1 holds; it matches its schema; `project` matches;
@@ -167,13 +173,13 @@ responsibility, the tool and the tool version (R-P4, R-P5).
 ## 7. Evaluation
 
 The evaluation reads a project folder and produces a **ProjectReport**
-([`../schemas/project-report-v1.schema.json`](../schemas/project-report-v1.schema.json), canonical per R-B1). It is
+([`../schemas/project-report-v2.schema.json`](../schemas/project-report-v2.schema.json), canonical per R-B1). It is
 pure: identical folders give identical reports.
 
-- **R-E1: Project.** If `edge-project.jsonld` is missing, unparseable, has a foreign context, an unsupported version
-  or fails its schema, the report has `valid: false`, `project: null`, `stages: {}`, `artifacts: []`, and exactly one
-  diagnostic (E-NOT-A-PROJECT, E-PROJECT-INVALID, E-CTX-EXTERNAL or E-UNSUPPORTED-VERSION, path
-  `edge-project.jsonld`), and evaluation stops.
+- **R-E1: Project.** If `edge-project.jsonld` is missing, cannot be read, is unparseable, has a foreign context, an
+  unsupported version or fails its schema, the report has `valid: false`, `project: null`, `stages: {}`,
+  `artifacts: []`, and exactly one diagnostic (E-NOT-A-PROJECT, E-UNREADABLE with its `error` (R-E10),
+  E-PROJECT-INVALID, E-CTX-EXTERNAL or E-UNSUPPORTED-VERSION, path `edge-project.jsonld`), and evaluation stops.
 
 - **R-E2: Classifying stage-folder files.** In each stage folder, directly (not recursively, except `revisions/`):
   - a name starting with `.eps-tmp-` → **W-TEMP-FILE**, otherwise ignored;
@@ -188,90 +194,117 @@ pure: identical folders give identical reports.
   - in `revisions/` (not in `source/`), a name matching R-B4 → a revision file;
   - anything else, including sync-conflict copies such as `rev-…-DESKTOP-1.jsonld` → **W-FOREIGN-FILE**, ignored.
 
+  Classification uses names only. An entry whose name makes it an artifact, a record or a revision, but which cannot
+  be read, is handled by R-E10; any other entry is never read, so whether it can be read does not matter.
+
 - **R-E3: Registered artifacts.** An artifact is **registered** when its record is valid (R-P4) and the artifact's
   bytes have the record's `sha256` and `bytes`. An artifact file without a record → **W-UNREGISTERED**. A valid
   record whose artifact's bytes differ → **E-INTEGRITY** (path: the artifact). An invalid record → its code from
   R-P4 (path: the record). Only registered artifacts appear in the report's `artifacts`.
 
 - **R-E4: Source membership.** The members of `source/` are its registered artifacts. The source stage's `status`
-  is `ok` with at least one member and `empty` otherwise; its `heads` is `[]` and its `current` is the member paths.
-  Any registered artifact in `source/` is `inStageCurrent: true`.
+  is `unevaluable` when `source/` or one of its artifacts or records cannot be read (R-E10), else `ok` with at least
+  one member and `empty` otherwise; its `heads` is `[]` and its `current` is the member paths. Any registered
+  artifact in `source/` is `inStageCurrent: true`.
 
 - **R-E5: Revision graph, heads and stage status** (every stage except `source`):
   1. A revision file that does not parse as JSON and whose `sha256` no well-formed revision cites as a parent is an
      **interrupted commit**: **W-INTERRUPTED-REVISION**, ignored.
   2. Any other revision file that is not well-formed → **E-REVISION-INVALID** (or E-CTX-EXTERNAL,
      E-FOREIGN-PROJECT or E-WRONG-RESPONSIBILITY when that is the first failure), and the stage is **damaged**.
-  3. A well-formed revision citing a parent that is not the `sha256` of a well-formed revision file in the same
-     folder → **E-MISSING-PARENT** (path: the citing revision), and the stage is **incomplete**.
+  3. A well-formed revision citing a parent that is neither the `sha256` of a well-formed revision file in the same
+     folder nor the hash named by a revision file there that cannot be read (R-E10) → **E-MISSING-PARENT** (path:
+     the citing revision), and the stage is **incomplete**.
   4. **Heads** are the well-formed revisions that no well-formed revision cites as a parent.
-  5. With exactly one head, each of its `current` entries must name a registered artifact at that path with that
-     `sha256`; otherwise **E-CURRENT-UNRESOLVED** (path: the head), and the stage is **damaged**.
-  6. More than one head → **E-STAGE-CONFLICT** (path: the stage folder name), and the stage is **conflicted**.
-  7. Status is the first that applies: `damaged`, `incomplete`, `conflicted`, `empty` (no well-formed revision),
-     `out-of-date` (some artifact in the head's `current` is not up to date, R-E6), `ok`.
-  8. The report's `heads` lists head revision paths, sorted. Its `current` lists the head's `current` paths only
-     when the status is `ok` or `out-of-date`, and is `[]` otherwise. An artifact is `inStageCurrent` exactly when
-     its path is in that list.
+  5. With exactly one head, and every revision file of the stage readable, each of the head's `current` entries
+     must name a registered artifact at that path with that `sha256`. An entry naming an artifact that is present
+     but cannot be evaluated (R-E10) is **unknown**. Any other unresolved entry → **E-CURRENT-UNRESOLVED** (path:
+     the head), and the stage is **damaged**; otherwise, with an unknown entry, the stage is **unevaluable**.
+  6. More than one head, with every revision file of the stage readable → **E-STAGE-CONFLICT** (path: the stage
+     folder name), and the stage is **conflicted**.
+  7. Status is the first that applies: `damaged`, `incomplete`, `unevaluable` (a revision file, `revisions/` or the
+     stage folder cannot be read, or point 5 found an unknown entry), `conflicted`, `empty` (no well-formed
+     revision), `out-of-date` (some artifact in the head's `current` is definitely not up to date: `upToDate` is
+     `false`, R-E6), `ok`. An artifact whose freshness cannot be evaluated (`upToDate: null`) does not by itself make
+     its stage out of date.
+  8. The report's `heads` lists head revision paths, sorted, and is `[]` when a revision file cannot be read. Its
+     `current` lists the head's `current` paths only when the status is `ok` or `out-of-date`, and is `[]`
+     otherwise. An artifact's `inStageCurrent` is whether its path is in that list, and `null` when the stage is
+     `unevaluable`.
   9. A registered artifact, outside `source/`, that no well-formed revision of its stage lists in `current` →
-     **W-UNCOMMITTED** (an interrupted or abandoned commit).
+     **W-UNCOMMITTED** (an interrupted or abandoned commit), unless a revision file of the stage cannot be read.
 
-- **R-E6: Up to date (recursive).** A registered artifact is **up to date** when `staleBecause` is empty. Only
-  **dependency** inputs count (history inputs are R-E9). For each one:
+- **R-E6: Up to date (recursive).** Each registered artifact gets `staleBecause`, a list of reasons. Two of them,
+  `INPUT-UNREADABLE` and `UPSTREAM-UNEVALUABLE`, are **indefinite**: they say that something could not be evaluated
+  (R-E10), not that it is wrong. `upToDate` is `false` when any reason is definite, `null` when there are only
+  indefinite reasons, and `true` when there are none. Only **dependency** inputs count (history inputs are R-E9).
+  For each one:
   - an **artifact input** `{role, relation: "dependency", path, sha256}`:
-    - the file at `path` exists but its bytes do not have that `sha256` → `INPUT-ALTERED`;
+    - the file at `path`, or a folder on the way to it, cannot be read, or the artifact there is present but cannot
+      be evaluated (R-E10) → `INPUT-UNREADABLE`;
+    - otherwise, the file at `path` exists but its bytes do not have that `sha256` → `INPUT-ALTERED`;
     - otherwise, no registered artifact at `path` with that `sha256` → `INPUT-MISSING`;
     - otherwise, if the input lies outside `source/`: when the input's stage status is `damaged`, `incomplete`,
-      `conflicted` or `empty` → `UPSTREAM-UNSETTLED`; else, when the input is not in that stage's `current` and
-      lies in a **different** stage from the artifact → `INPUT-SUPERSEDED`. (A same-stage dependency is normally
-      superseded by the very artifact that uses it, so supersession alone does not make it stale; its own
-      freshness still propagates through the next point.)
+      `conflicted` or `empty` → `UPSTREAM-UNSETTLED`; when it is `unevaluable` → `UPSTREAM-UNEVALUABLE`; else,
+      when the input is not in that stage's `current` and lies in a **different** stage from the artifact →
+      `INPUT-SUPERSEDED`. (A same-stage dependency is normally superseded by the very artifact that uses it, so
+      supersession alone does not make it stale; its own freshness still propagates through the next point.)
     - and: if the input is on a common cycle with the artifact (below) → `CYCLE`; otherwise, if the input artifact
-      itself is not up to date → `UPSTREAM-OUT-OF-DATE`;
+      itself has `upToDate: false` → `UPSTREAM-OUT-OF-DATE`, or `upToDate: null` → `UPSTREAM-UNEVALUABLE`;
   - a **collection input**: when `members` differs from the current source membership (R-E4), compared as sets of
-    `{path, sha256}` pairs → `SOURCE-CHANGED`, with `added` (current members not in `members`) and `removed`
-    (`members` not current), each sorted by `path`. Renaming, adding, removing or editing a source file therefore
-    all register.
+    `{path, sha256}` pairs and leaving out source paths that cannot be evaluated → `SOURCE-CHANGED`, with `added`
+    (current members not in `members`) and `removed` (`members` not current), each sorted by `path`. Renaming,
+    adding, removing or editing a source file therefore all register. In addition, each source artifact that is
+    present but cannot be evaluated → `INPUT-UNREADABLE` with that path, and a `source/` folder that cannot be
+    listed → `INPUT-UNREADABLE` with input `source`.
 
   **Cycles.** The dependency inputs that resolve to registered artifacts form a directed graph. Two artifacts are
   on a **common cycle** when each can be reached from the other along dependency inputs; an artifact that cites
   itself is on a cycle with itself. An input on a common cycle with the citing artifact gets `CYCLE` in place of
   `UPSTREAM-OUT-OF-DATE`; the other checks for that input still apply. So every artifact on a cycle carries at least
-  one `CYCLE` reason and is not up to date, and an artifact outside the cycle that depends on a member of it gets
+  one `CYCLE` reason and has `upToDate: false`, and an artifact outside the cycle that depends on a member of it gets
   `UPSTREAM-OUT-OF-DATE`. The rule is defined on the graph, not on a traversal, so the report does not depend on the
   order in which a reader visits artifacts (EX-24).
 
   Each reason is `{code, input}`, where `input` is the input's `path` (or `source` for a collection input). A
-  `SOURCE-CHANGED` reason also carries `added` and `removed`. Reasons are sorted by `input`, then by `code`.
+  `SOURCE-CHANGED` reason also carries `added` and `removed`. A reason appears once per `code` and `input`. Reasons
+  are sorted by `input`, then by `code`.
   Artifacts in `source/` have no inputs and are always up to date.
 
-- **R-E7: Pipeline readiness.** For an artifact in `source/`, `pipelineReady` is `null` and `notReadyBecause` is
-  `[]`. For any other registered artifact, `notReadyBecause` collects, in this order:
-  - `OUT-OF-DATE` if it is not up to date;
-  - `NOT-CURRENT` if it is not `inStageCurrent`;
-  - outside `normalized/`, from its **structural roots**: the set of `normalized/` artifacts reached by following
-    dependency inputs recursively (never history inputs; each artifact visited once, so cycles terminate), stopping
-    at each `normalized/` artifact. `NO-STRUCTURAL-ROOT` if there are none; `STRUCTURAL-ROOT-MISMATCH` if there is
-    more than one.
-
-  `pipelineReady` is `true` exactly when `notReadyBecause` is empty. It means **structural readiness for downstream
-  processing** and nothing more: it does not imply that provenance is complete (R-W6), that history is verified
-  (R-E9), or that the author is authenticated (§12). This makes the **normalized schema the structural source of
-  truth**: an SDD (or any later artifact) built without a normalized schema is recorded honestly and may be up to
-  date, but is never pipeline-ready, and nothing downstream may mix two normalized schemas.
+- **R-E7:** retired in v0.2. In v0.1 it defined pipeline readiness (`pipelineReady`, `notReadyBecause`); the
+  contract no longer prescribes which stage's output a tool takes as input. Its identifier is not reused.
 
 - **R-E8: Report order.** `stages` lists every registry stage in §3 order. `artifacts` is sorted by `path`.
-  `diagnostics` is `{code, path}` objects, sorted by `path`, then `code`. All sorting is by UTF-16 code unit, as
+  `diagnostics` is `{code, path}` objects, with `error` added for E-UNREADABLE, sorted by `path`, then `code`. All sorting is by UTF-16 code unit, as
   JavaScript's default sort.
 
 - **R-E9: Historical provenance.** For each **history** input `{role, relation: "history", path, sha256}` of a
   registered artifact:
-  - the file at `path` exists but its bytes do not have that `sha256` → `HISTORY-ALTERED`;
+  - the file at `path` cannot be read, or the artifact there is present but cannot be evaluated (R-E10) →
+    `HISTORY-UNREADABLE` (indefinite);
+  - otherwise, the file at `path` exists but its bytes do not have that `sha256` → `HISTORY-ALTERED`;
   - otherwise, no registered artifact at `path` with that `sha256` → `HISTORY-MISSING`.
 
-  Reasons are `{code, input}` in `historyBecause`, sorted by `input`, then `code`, and `historyVerified` is `true`
-  exactly when `historyBecause` is empty (an artifact with no history inputs is verified). History never affects
-  `upToDate`, `staleBecause`, structural roots or `pipelineReady` (decision D11 in [`../PROPOSAL.md`](../PROPOSAL.md)).
+  Reasons are `{code, input}` in `historyBecause`, once per `code` and `input`, sorted by `input`, then `code`.
+  `historyVerified` is `false` when any reason is `HISTORY-ALTERED` or `HISTORY-MISSING`, `null` when the only
+  reasons are `HISTORY-UNREADABLE`, and `true` when there are none (an artifact with no history inputs is verified).
+  History never affects `upToDate` or `staleBecause`.
+
+- **R-E10: Files that cannot be read.** A file the evaluation must read (the project file; a file in a stage folder
+  or in `revisions/` whose name makes it an artifact, a record or a revision; a file a record cites by a safe path)
+  that cannot be read, or a stage folder, `revisions/` folder or folder on the way to a cited file that cannot be
+  listed, is reported once as **E-UNREADABLE** with its `path` and `error`, the error the file system or browser
+  gave (for example `EIO`, `EACCES`, `UNKNOWN` or `NotReadableError`). The evaluation does not stop. What could not
+  be read is **not evaluated**, never guessed:
+  - an artifact whose bytes or record cannot be read is **present but cannot be evaluated**: it is not registered,
+    and it is neither W-UNREGISTERED nor E-INTEGRITY, and not a source member or a non-member;
+  - a revision file that cannot be read still names its identity (R-B4), so it is not a missing parent; but the
+    stage's heads cannot be known, so the stage is `unevaluable` (R-E5);
+  - whatever depends on something not evaluated gets an indefinite reason (R-E6, R-E9) and `null`, unless a definite
+    reason already decides it.
+
+  A file that is unreadable only for a moment (for example an OneDrive file that is not downloaded while the PC is
+  offline) is reported the same way, and the next evaluation after it can be read again is complete.
 
 ## 8. Writers
 
@@ -307,7 +340,8 @@ pure: identical folders give identical reports.
   writer MUST NOT pick a side on its own. After a person chooses, it writes a **merge revision** whose `parents`
   are all the heads and whose `current` is the chosen content.
 - **R-W4: Refuse on damage.** A writer MUST NOT write a revision in a stage whose status is `damaged` because of
-  E-REVISION-INVALID, or `incomplete`. In a stage `damaged` only by E-CURRENT-UNRESOLVED, it MAY write a repair
+  E-REVISION-INVALID, `incomplete` or `unevaluable` (its heads are unknown, R-E10), and MUST NOT cite the source
+  collection while `source/` is `unevaluable` (its members are unknown). In a stage `damaged` only by E-CURRENT-UNRESOLVED, it MAY write a repair
   revision whose parent is the damaged head and whose `current` lists only registered artifacts.
 - **R-W5: Before writing,** a writer evaluates the stage, and checks that no new revision appeared since it
   evaluated, immediately before creating its revision. This narrows the window for a fork on one machine. It does
@@ -330,7 +364,7 @@ pure: identical folders give identical reports.
     between tabs of one tool. Another program, or a synchronizing client, that creates the same name in between can
     be overwritten. For revisions this is harmless, because equal names mean equal bytes (R-B4). For an artifact or
     a record it is a breach of R-W1 that the backend cannot prevent. A replaced artifact is detected by its hash
-    (E-INTEGRITY, E-CURRENT-UNRESOLVED); a replaced record of byte-identical content is not detectable in v0.1.
+    (E-INTEGRITY, E-CURRENT-UNRESOLVED); a replaced record of byte-identical content is not detectable.
 
   A writer MUST use the exclusive level wherever its backend offers it, and MUST NOT use a primitive that can
   replace an existing name (such as `rename()` onto a name that may exist) when an exclusive one is available.
@@ -379,6 +413,7 @@ committed files (R-W1). Removing leftovers is something a person may choose to d
 | partial artifact or record under its final name (only where content writes are not atomic, §11) | bytes that do not match | E-INTEGRITY or E-RECORD-INVALID | write again, leaving the damaged files untouched. A partial artifact: R-W1 tries the longer prefixes, then a later `createdAt` if all four are taken. A damaged record: its name is fixed by its artifact's, so R-W1 writes the artifact again under a later `createdAt`, with a new record. If the damaged artifact is in a head, write a repair revision (R-W4) | delete the damaged files |
 | revision cites a parent not (yet) present | stage `incomplete` | E-MISSING-PARENT | none: writes are refused (R-W4) | wait for synchronization, or restore the parent |
 | artifact name taken on another machine (found after synchronization) | a sync-conflict copy; stage conflicted | W-FOREIGN-FILE, E-STAGE-CONFLICT (EX-25) | write the artifact again under a longer prefix and its own record; then a merge revision once a person has chosen (R-W3) | delete the conflict copy |
+| (not a write) a file cannot be read, for example an OneDrive file not downloaded while offline | the file, unchanged | E-UNREADABLE with its error; what depends on it is not evaluated (R-E10) | none needed: evaluate again once it can be read; writes to an `unevaluable` stage are refused (R-W4) | bring the PC online, or download the file |
 
 ## 11. Write guarantees by backend
 
@@ -391,6 +426,13 @@ content is always detected by its hash, so correctness never depends on it.
 | **Node** (`node:fs`) | **exclusive** | write `.eps-tmp-…`, `fsync` it, `link()` it to the final name (fails if the name exists), remove the temporary file: no overwrite and atomic content | where hard links are not supported (some network and cloud-backed folders): open the final name with the exclusive-create flag (`wx`), write and `fsync`. Still no overwrite, but content is not atomic. Never `rename()` onto the final name | a crash during the fallback can leave a partial file (detected); power loss can lose a just-written file, because Windows cannot `fsync` a directory |
 | **Browser** (File System Access, adapted from mermaid) | **checked** (the API has no exclusive create) | check the name is free, write `.eps-tmp-…` with `createWritable()`, close it, `move()` it to the final name | without `move()`: check, then write the final name directly. Chromium stages writes in a swap file and applies them on `close()`, which in practice avoids partial files, but that is browser behaviour, not a standard guarantee | the check-then-create window (R-W9); no control over flushing to disk |
 | **Synchronized folders** | not a backend: the sync client sits under either one | the sync client uploads files after they are closed | | a remote file can arrive later than files that cite it (E-MISSING-PARENT, INPUT-MISSING until it arrives); artifact name collisions between machines (§9, EX-25) |
+
+Work files (§6) are replaced, not created: the Node backend writes a temporary file and renames it onto the work
+file, retrying for about 1.5 seconds when Windows refuses because another program (OneDrive, antivirus) holds the
+file open. Committed files never take that path.
+
+A file in a cloud-backed folder that is listed but not downloaded can fail to read while offline; that is reported,
+not fatal (R-E10).
 
 Exact behaviour on cloud-backed folders (OneDrive Files On-Demand, network shares), including whether `link()`
 and `wx` are honoured there, is verified in slice 3, with results recorded here.
@@ -414,10 +456,11 @@ builds each folder by construction and states each expected report by hand from 
 evaluates a folder, so it is not an implementation of §7, and slice 2's implementation is judged against these
 reports. The index is [`../examples/README.md`](../examples/README.md).
 
-Symbolic links and junctions (R-B6, R-E2) cannot be stored portably in git, so they have no example folder. They
-are tested in slice 3 against each backend, on a real file system.
+Symbolic links and junctions (R-B6, R-E2) cannot be stored portably in git, and neither can a file that cannot be
+read (R-E10), so they have no example folder. They are tested by the module's unit tests, and links also against
+the Node backend on a real file system.
 
-## 14. Non-goals (v0.1)
+## 14. Non-goals
 
 Any writer operation that deletes, retires or withdraws a committed file (a new revision is the only way to change
 what is current; people may still remove files themselves, R-W10); renaming a project; merging work in progress;

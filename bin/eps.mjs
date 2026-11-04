@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// eps: create, write and inspect edge project folders (EPS v0.1) from the command line.
+// eps: create, write and inspect edge project folders (EPS v0.2) from the command line.
 //
 //   eps init <folder> --name <name>
 //   eps status <folder>                    summary; exit 0 clean, 1 needs attention, 2 not a project or bad usage
@@ -64,17 +64,17 @@ async function report(folder) {
   return evaluate(await loadTree(nodeBackend(folder)));
 }
 
-/** 0 clean, 1 needs attention (an error diagnostic or an unsettled stage), 2 not a project. */
+/** 0 clean, 1 needs attention (an error diagnostic, or a damaged, incomplete, conflicted or unevaluable stage), 2 not a project. */
 export function exitCode(r) {
   if (!r.valid) return 2;
   if (r.diagnostics.some((d) => d.code.startsWith('E-'))) return 1;
-  if (Object.values(r.stages).some((s) => ['damaged', 'incomplete', 'conflicted'].includes(s.status))) return 1;
+  if (Object.values(r.stages).some((s) => ['damaged', 'incomplete', 'conflicted', 'unevaluable'].includes(s.status))) return 1;
   return 0;
 }
 
 export function summary(r) {
   const lines = [];
-  if (!r.valid) return `not a valid project: ${r.diagnostics.map((d) => `${d.code} ${d.path}`).join(', ')}`;
+  if (!r.valid) return `not a valid project: ${r.diagnostics.map((d) => `${d.code} ${d.path}${d.error ? ` (${d.error})` : ''}`).join(', ')}`;
   lines.push(`project ${r.project}`);
   for (const [stage, s] of Object.entries(r.stages)) {
     if (s.status === 'empty' && s.heads.length === 0) { lines.push(`  ${stage.padEnd(10)} empty`); continue; }
@@ -83,16 +83,18 @@ export function summary(r) {
     for (const path of s.current) {
       const a = r.artifacts.find((x) => x.path === path);
       const flags = [];
-      if (a && !a.upToDate) flags.push(`out of date: ${a.staleBecause.map((x) => `${x.code} ${x.input}`).join('; ')}`);
-      if (a && !a.historyVerified) flags.push(`history: ${a.historyBecause.map((x) => x.code).join(', ')}`);
-      if (a && a.pipelineReady === true) flags.push('pipeline-ready');
-      if (a && a.pipelineReady === false) flags.push(`not ready: ${a.notReadyBecause.join(', ')}`);
+      const reasons = (list) => list.map((x) => `${x.code} ${x.input}`).join('; ');
+      if (a?.upToDate === true) flags.push('up to date');
+      if (a?.upToDate === false) flags.push(`out of date: ${reasons(a.staleBecause)}`);
+      if (a?.upToDate === null) flags.push(`not evaluable: ${reasons(a.staleBecause)}`);
+      if (a?.historyVerified === false) flags.push(`history: ${reasons(a.historyBecause)}`);
+      if (a?.historyVerified === null) flags.push(`history not evaluable: ${reasons(a.historyBecause)}`);
       lines.push(`    ${path}${flags.length ? `  [${flags.join(' | ')}]` : ''}`);
     }
   }
   if (r.diagnostics.length) {
     lines.push('diagnostics:');
-    for (const d of r.diagnostics) lines.push(`  ${d.code.padEnd(24)} ${d.path}`);
+    for (const d of r.diagnostics) lines.push(`  ${d.code.padEnd(24)} ${d.path}${d.error ? `  (${d.error})` : ''}`);
   }
   const stale = Object.entries(r.stages).filter(([, s]) => s.status === 'out-of-date').map(([stage]) => stage);
   if (exitCode(r) !== 0) lines.push('status: needs attention');

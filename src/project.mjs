@@ -16,7 +16,7 @@ const PLACE_ATTEMPTS = 4;
 /**
  * A writer refusal or failure. `code` is the contract's E-NAME-TAKEN (R-W1) or one of this module's own codes:
  * NOT-A-PROJECT, PROJECT-EXISTS, NOT-RESPONSIBLE, BAD-ARGUMENT, INPUT-NOT-REGISTERED, REFUSED-DAMAGED,
- * REFUSED-INCOMPLETE, REFUSED-CONFLICTED, NOT-CONFLICTED, STAGE-CHANGED.
+ * REFUSED-INCOMPLETE, REFUSED-UNEVALUABLE, REFUSED-CONFLICTED, NOT-CONFLICTED, STAGE-CHANGED.
  */
 export class EpsWriteError extends Error {
   constructor(code, message) {
@@ -37,11 +37,20 @@ const headHash = (headPath) => parseRevisionName(headPath.split('/').at(-1)).sha
 /**
  * Reads what the evaluation needs: the project file, each stage folder's files, its revisions/, and any other file
  * a record cites by a safe path outside work/. Folders are listed only when needed; dot-entries and work/ are never
- * read; `other` entries are never listed or read.
+ * read; `other` entries are never listed or read. A file that cannot be read, or a folder that cannot be listed,
+ * becomes an `unreadable` entry with the backend's error code, so the evaluation reports it (R-E10) instead of
+ * stopping.
  */
 export async function loadTree(backend) {
   const tree = { type: 'dir', entries: new Map(), listed: true };
-  for (const e of (await backend.list('')) ?? []) {
+  let rootEntries;
+  try {
+    rootEntries = (await backend.list('')) ?? [];
+  } catch (e) {
+    tree.entries.set(PROJECT_FILE, { type: 'unreadable', error: errorCode(e) });
+    return tree;
+  }
+  for (const e of rootEntries) {
     if (e.name === PROJECT_FILE) tree.entries.set(e.name, await entryNode(backend, e.name, e.type, true));
     else if (RESPONSIBILITY.has(e.name)) tree.entries.set(e.name, await entryNode(backend, e.name, e.type, false));
   }
@@ -50,7 +59,7 @@ export async function loadTree(backend) {
     const folder = tree.entries.get(stage);
     if (folder?.type !== 'dir') continue;
     await fill(backend, stage, folder, readable);
-    const revisions = folder.entries.get('revisions');
+    const revisions = folder.entries?.get('revisions');
     if (stage !== 'source' && revisions?.type === 'dir') await fill(backend, `${stage}/revisions`, revisions, readable);
   }
   for (const { stage } of STAGES) {
@@ -68,11 +77,28 @@ export async function loadTree(backend) {
   return tree;
 }
 
+// The error a backend gave, as a short code for E-UNREADABLE: Node's `code` (EIO, EACCES, ...) or a DOMException's
+// `name` (NotReadableError, ...).
+function errorCode(e) {
+  const ok = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v);
+  return ok(e?.code) ? e.code : ok(e?.name) ? e.name : 'UNKNOWN';
+}
+
+const makeUnreadable = (node, e) => {
+  for (const k of Object.keys(node)) delete node[k];
+  return Object.assign(node, { type: 'unreadable', error: errorCode(e) });
+};
+
 // Lists a folder into `dir`, reading the files `read(name, type)` selects; the rest stay unread placeholders.
 async function fill(backend, path, dir, read) {
-  for (const e of (await backend.list(path)) ?? []) {
-    dir.entries.set(e.name, await entryNode(backend, `${path}/${e.name}`, e.type, read(e.name, e.type)));
+  let listing;
+  try {
+    listing = (await backend.list(path)) ?? [];
+  } catch (e) {
+    makeUnreadable(dir, e);
+    return;
   }
+  for (const e of listing) dir.entries.set(e.name, await entryNode(backend, `${path}/${e.name}`, e.type, read(e.name, e.type)));
   dir.listed = true;
 }
 
@@ -80,8 +106,12 @@ async function entryNode(backend, path, type, read) {
   if (type === 'dir') return { type: 'dir', entries: new Map(), listed: false };
   if (type !== 'file') return { type: 'other' };
   if (!read) return { type: 'file', bytes: null };
-  const bytes = await backend.read(path);
-  return bytes ? { type: 'file', bytes } : { type: 'other' };
+  try {
+    const bytes = await backend.read(path);
+    return bytes ? { type: 'file', bytes } : { type: 'other' };
+  } catch (e) {
+    return makeUnreadable({}, e);
+  }
 }
 
 // Makes one cited path present in the tree, listing folders and reading the file on the way, never through `other`.
@@ -90,11 +120,18 @@ async function loadPath(backend, tree, path) {
   for (const s of path.split('/')) {
     if (node.type !== 'dir') return;
     if (!node.listed) await fill(backend, at, node, () => false);
+    if (node.type !== 'dir') return;
     at = at ? `${at}/${s}` : s;
     node = node.entries.get(s);
     if (!node) return;
   }
-  if (node.type === 'file' && node.bytes === null) node.bytes = (await backend.read(at)) ?? new Uint8Array();
+  if (node.type === 'file' && node.bytes === null) {
+    try {
+      node.bytes = (await backend.read(at)) ?? new Uint8Array();
+    } catch (e) {
+      makeUnreadable(node, e);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -147,6 +184,9 @@ export async function openProject(backend, { tool, version, responsibilities = [
     const out = inputs.map((i) => {
       if (!ROLE.test(i.role ?? '')) throw new EpsWriteError('BAD-ARGUMENT', `input role ${i.role}`);
       if (i.collection === 'source') {
+        if (report.stages.source.status === 'unevaluable') {
+          throw new EpsWriteError('REFUSED-UNEVALUABLE', 'source/ has files that cannot be read, so its members are unknown (R-W4)');
+        }
         const members = report.stages.source.current.map((path) => ({ path, sha256: registered.get(path).sha256 }));
         return { role: i.role, relation: 'dependency', collection: 'source', members };
       }
@@ -249,6 +289,7 @@ export async function openProject(backend, { tool, version, responsibilities = [
   function requireWritable(report, stage, { merging }) {
     const s = report.stages[stage];
     if (s.status === 'incomplete') throw new EpsWriteError('REFUSED-INCOMPLETE', `${stage} is incomplete (R-W4)`);
+    if (s.status === 'unevaluable') throw new EpsWriteError('REFUSED-UNEVALUABLE', `${stage} has files that cannot be read, so its heads are unknown (R-W4)`);
     if (s.status === 'damaged') {
       const repairable = report.diagnostics
         .filter((d) => d.path.startsWith(`${stage}/revisions/`) && d.code.startsWith('E-'))

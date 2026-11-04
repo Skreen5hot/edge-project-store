@@ -1,7 +1,7 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@type": "ProjectReport",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "project": "urn:uuid:00000000-0000-4000-8000-000000000012",
   "valid": true,
   "stages": {
@@ -15,7 +15,7 @@
     "normalized": {
       "status": "ok",
       "heads": [
-        "normalized/revisions/rev-20261101T091001Z-0d9328582ac995d690d3225e54697dde4f8767f11e3a159d957bbcab4c3327b7.jsonld"
+        "normalized/revisions/rev-20261101T091001Z-8b06ff89eec6c2198d9eb4b8830fd2a8c4ba4454d76e648087905b892b6ced95.jsonld"
       ],
       "current": [
         "normalized/normalized-20261101T091000Z-4c173267.json"
@@ -24,7 +24,7 @@
     "sdd": {
       "status": "incomplete",
       "heads": [
-        "sdd/revisions/rev-20261101T120001Z-9b972733d1985a56791c1ffa9b66ec52eefb445f6d980f0375b67435002ea396.jsonld"
+        "sdd/revisions/rev-20261101T120001Z-126c042beb6517d87c9af904881216803b7c54661c2b2cbccecc4fa539a75eed.jsonld"
       ],
       "current": []
     },
@@ -58,9 +58,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": true,
-      "notReadyBecause": []
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T100000Z-fa7eae25.jsonld",
@@ -70,11 +68,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "NOT-CURRENT"
-      ]
+      "historyBecause": []
     },
     {
       "path": "sdd/sdd-20261101T120000Z-ccc1e7e8.jsonld",
@@ -84,11 +78,7 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": false,
-      "notReadyBecause": [
-        "NOT-CURRENT"
-      ]
+      "historyBecause": []
     },
     {
       "path": "source/schema-20261101T090000Z-67daa493.json",
@@ -98,15 +88,13 @@
       "upToDate": true,
       "staleBecause": [],
       "historyVerified": true,
-      "historyBecause": [],
-      "pipelineReady": null,
-      "notReadyBecause": []
+      "historyBecause": []
     }
   ],
   "diagnostics": [
     {
       "code": "E-MISSING-PARENT",
-      "path": "sdd/revisions/rev-20261101T120001Z-9b972733d1985a56791c1ffa9b66ec52eefb445f6d980f0375b67435002ea396.jsonld"
+      "path": "sdd/revisions/rev-20261101T120001Z-126c042beb6517d87c9af904881216803b7c54661c2b2cbccecc4fa539a75eed.jsonld"
     },
     {
       "code": "W-UNCOMMITTED",

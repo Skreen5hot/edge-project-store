@@ -62,12 +62,12 @@ test('R-B3, R-B4: name parsing', () => {
 
 test('R-E1 / R-P3: project file failures, in order', () => {
   const file = (v) => ({ type: 'file', bytes: typeof v === 'string' ? new TextEncoder().encode(v) : canonicalBytes(v) });
-  const good = { '@context': CONTEXT_IRI, '@id': PROJECT, '@type': 'EdgeProject', contractVersion: 1, name: 'x', createdAt: '2026-11-01T08:00:00Z' };
+  const good = { '@context': CONTEXT_IRI, '@id': PROJECT, '@type': 'EdgeProject', contractVersion: 2, name: 'x', createdAt: '2026-11-01T08:00:00Z' };
   assert.equal(checkProjectFile(undefined).code, 'E-NOT-A-PROJECT');
   assert.equal(checkProjectFile({ type: 'other' }).code, 'E-NOT-A-PROJECT');
   assert.equal(checkProjectFile(file('{')).code, 'E-PROJECT-INVALID');
-  assert.equal(checkProjectFile(file({ ...good, '@context': 'x', contractVersion: 2 })).code, 'E-CTX-EXTERNAL');
-  assert.equal(checkProjectFile(file({ ...good, contractVersion: 2 })).code, 'E-UNSUPPORTED-VERSION');
+  assert.equal(checkProjectFile(file({ ...good, '@context': 'x', contractVersion: 1 })).code, 'E-CTX-EXTERNAL');
+  assert.equal(checkProjectFile(file({ ...good, contractVersion: 1 })).code, 'E-UNSUPPORTED-VERSION', 'v0.1 files are not read by v0.2');
   assert.equal(checkProjectFile(file({ ...good, name: '' })).code, 'E-PROJECT-INVALID');
   assert.equal(checkProjectFile(file({ ...good, extra: 1 })).code, 'E-PROJECT-INVALID');
   assert.equal(checkProjectFile(file(good)).ok, true);
@@ -88,7 +88,7 @@ test('R-P4: record checks report the first failure in the contract order', () =>
     ['foreign context beats schema', (r) => { r['@context'] = 'x'; delete r.kind; }, 'E-CTX-EXTERNAL'],
     ['schema: unknown key', (r) => { r.extra = 1; }, 'E-RECORD-INVALID'],
     ['schema: negative bytes', (r) => { r.bytes = -1; }, 'E-RECORD-INVALID'],
-    ['schema: contract version', (r) => { r.contractVersion = 2; }, 'E-RECORD-INVALID'],
+    ['schema: contract version', (r) => { r.contractVersion = 1; }, 'E-RECORD-INVALID'],
     ['foreign project beats name mismatch', (r) => { r.project = 'urn:uuid:00000000-0000-4000-8000-00000000000f'; r.kind = 'x'; }, 'E-FOREIGN-PROJECT'],
     ['kind disagrees with name', (r) => { r.kind = 'sdd2'; }, 'E-RECORD-INVALID'],
     ['createdAt disagrees with name', (r) => { r.createdAt = '2026-11-01T10:00:01Z'; }, 'E-RECORD-INVALID'],
@@ -126,7 +126,7 @@ test('R-P4.10: member lists are sorted, without duplicates, inside source/', () 
 test('the report does not depend on the order of folder entries', () => {
   const reverse = (node) => node.type === 'dir'
     ? { type: 'dir', entries: new Map([...node.entries].reverse().map(([k, v]) => [k, reverse(v)])) } : node;
-  for (const name of ['EX-08-stage-conflict', 'EX-17-structural-root-mismatch', 'EX-24-dependency-cycle', 'EX-25-sync-name-collision']) {
+  for (const name of ['EX-08-stage-conflict', 'EX-17-two-normalized-inputs', 'EX-24-dependency-cycle', 'EX-25-sync-name-collision']) {
     const tree = example(name);
     assert.equal(report(reverse(tree)), report(tree), name);
   }
@@ -145,7 +145,7 @@ function artifactWithRecord(tree, stage, kind, time, content, inputs, { tool = '
   const hash = sha256(bytes);
   const name = `${kind}-${time.replace(/[-:]/g, '')}-${hash.slice(0, 8)}.txt`;
   const record = {
-    '@context': CONTEXT_IRI, '@type': 'ArtifactRecord', contractVersion: 1, project: PROJECT, stage, path: `${stage}/${name}`,
+    '@context': CONTEXT_IRI, '@type': 'ArtifactRecord', contractVersion: 2, project: PROJECT, stage, path: `${stage}/${name}`,
     kind, sha256: hash, bytes: bytes.length, generation: 'deterministic',
     producedBy: { responsibility, tool, version: '1' }, inputs, createdAt: time,
   };
@@ -164,7 +164,7 @@ test('R-E6 cycles: an artifact citing itself is on a cycle with itself', () => {
   const a = evaluate(tree).artifacts.find((x) => x.path === path);
   // diagrams/ has no revision, so the same-stage input is also in an unsettled stage (R-E6).
   assert.deepEqual(a.staleBecause, [{ code: 'CYCLE', input: path }, { code: 'UPSTREAM-UNSETTLED', input: path }]);
-  assert.deepEqual(a.notReadyBecause, ['OUT-OF-DATE', 'NOT-CURRENT', 'NO-STRUCTURAL-ROOT']);
+  assert.deepEqual([a.upToDate, a.inStageCurrent], [false, false]);
 });
 
 test('R-E6: a long dependency chain is evaluated without exhausting the stack', () => {
@@ -179,7 +179,7 @@ test('R-E6: a long dependency chain is evaluated without exhausting the stack', 
   assert.equal(r.artifacts.length, n + 3);
   const last = r.artifacts.find((a) => a.path === prev.path);
   assert.deepEqual(last.staleBecause.map((s) => s.code), ['UPSTREAM-OUT-OF-DATE', 'UPSTREAM-UNSETTLED']);
-  assert.deepEqual(last.notReadyBecause, ['OUT-OF-DATE', 'NOT-CURRENT'], 'the structural root is found through 3000 links');
+  assert.equal(last.upToDate, false, 'staleness is decided through 3000 links');
 });
 
 test('R-E5.1: an unparseable revision that a well-formed revision cites is damage, not an interruption', () => {
@@ -237,13 +237,13 @@ test('R-B6 / R-E6: inputs resolve by exact name and never through a link', () =>
   ]);
 });
 
-test('R-E7: history inputs never contribute structural roots', () => {
+test('R-E9: a history input never affects freshness', () => {
   const tree = example('EX-02-chain-ok');
   const norm = { path: 'normalized/normalized-20261101T091000Z-4c173267.json', sha256: '4c173267a5cb85aa5b8b4aa74123b78b7d874cea12df85c936a506a500b8b206' };
   const a = artifactWithRecord(tree, 'diagrams', 'd', '2026-11-01T11:00:00Z', 'h', [{ role: 'was', relation: 'history', ...norm }],
     { responsibility: 'diagram-exporter' });
   const r = evaluate(tree).artifacts.find((x) => x.path === a.path);
-  assert.deepEqual([r.historyVerified, r.notReadyBecause], [true, ['NOT-CURRENT', 'NO-STRUCTURAL-ROOT']]);
+  assert.deepEqual([r.historyVerified, r.upToDate, r.staleBecause], [true, true, []]);
 });
 
 test('reading S2: a missing @context or contractVersion is a schema failure', () => {

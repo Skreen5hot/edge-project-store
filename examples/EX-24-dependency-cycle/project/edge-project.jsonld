@@ -1,8 +1,8 @@
 {
-  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v1.jsonld",
+  "@context": "https://skreen5hot.github.io/edge-project-store/context/eps-v2.jsonld",
   "@id": "urn:uuid:00000000-0000-4000-8000-000000000024",
   "@type": "EdgeProject",
-  "contractVersion": 1,
+  "contractVersion": 2,
   "name": "Example 24",
   "createdAt": "2026-11-01T08:00:00Z"
 }
