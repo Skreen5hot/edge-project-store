@@ -8,6 +8,9 @@
   "engines": {
     "node": ">=22"
   },
+  "bin": {
+    "eps": "bin/eps.mjs"
+  },
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
     "check": "node tools/gen-examples.mjs --check && node tools/gen-schemas-module.mjs --check && node --test \"test/*.test.mjs\""
