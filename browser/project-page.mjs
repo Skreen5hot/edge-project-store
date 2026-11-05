@@ -4,7 +4,7 @@
 
 import { folderAccess, explainFolderError } from './access.mjs';
 import { saveFolder, loadFolder } from './handle-store.mjs';
-import { projectState, verdict } from './view.mjs';
+import { projectState, verdict, hints } from './view.mjs';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => { $(id).hidden = !on; };
@@ -25,6 +25,9 @@ async function render(handle) {
     $('verdict').textContent = verdict(state.exit);
     $('verdict').className = state.exit === 0 ? 'ok' : 'warn';
     $('status').textContent = state.text;
+    const advice = hints(state.report);
+    $('hints').textContent = advice.join('\n\n');
+    show('hints', advice.length > 0);
     $('sha').textContent = state.sha256;
     $('read-at').textContent = new Date().toLocaleString();
     show('result');

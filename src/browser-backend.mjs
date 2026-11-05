@@ -65,6 +65,16 @@ function randomHex(n) {
 export function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLocks, lockScope = 'eps', hooks = {}, now = () => Date.now() } = {}) {
   const stats = { move: 0, direct: 0 };
 
+  // Whether `dir` lists an entry `name` of `kind` ('file' or 'directory'). A listed entry that cannot be opened is not
+  // absent: on Windows, Chrome lists files whose full path is too long to open, and answers NotFoundError for them.
+  // Such a file is reported as unreadable (R-E10), never treated as missing.
+  async function listed(dir, name, kind) {
+    try {
+      for await (const [n, h] of dir.entries()) if (n === name && h.kind === kind) return true;
+    } catch { /* the folder itself cannot be listed: the caller's error stands */ }
+    return false;
+  }
+
   async function folder(parts, create) {
     let dir = root;
     for (const s of parts) {
@@ -72,7 +82,7 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
         dir = await dir.getDirectoryHandle(s, { create });
       } catch (e) {
         if (create && e?.name === 'TypeMismatchError') throw fail('NOT-A-FOLDER', `not a folder on the way: ${parts.join('/')}`);
-        if (absent(e)) return null;
+        if (!create && absent(e) && !(e?.name === 'NotFoundError' && await listed(dir, s, 'directory'))) return null;
         throw e;
       }
     }
@@ -134,8 +144,8 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
         const file = await (await dir.getFileHandle(parts.at(-1))).getFile();
         return new Uint8Array(await file.arrayBuffer());
       } catch (e) {
-        if (absent(e)) return null;
-        throw e; // NotReadableError and the like: the loader reports E-UNREADABLE with this name (R-E10)
+        if (absent(e) && !(e?.name === 'NotFoundError' && await listed(dir, parts.at(-1), 'file'))) return null;
+        throw e; // NotReadableError, or NotFoundError for a listed file: the loader reports E-UNREADABLE (R-E10)
       }
     },
     async create(path, bytes) {

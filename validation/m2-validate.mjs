@@ -20,6 +20,7 @@ import { hostname, tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseArtifactName, parseRevisionName, RECORD_SUFFIX } from '../src/contract.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const REPO = resolve(dirname(SELF), '..');
@@ -388,6 +389,23 @@ function writeReport(runDir) {
   p('prevented; the two-page test shows whether it was refused or detected. A record replaced by one with identical bytes');
   p('cannot be detected, and is harmless (the bytes are the same): a known limit, as R-W9 says.');
   p();
+  p('## Path length on this PC');
+  p();
+  const testFolder = join(runDir, 'test-folder');
+  const inside = longestInsideExamples();
+  let measured = false;
+  for (const t of tests) {
+    const row = testRow(t, /longest path this browser can write/);
+    const m = row && { raw: row.detail.match(/\[raw(>?=)(\d+)\]/), eps: row.detail.match(/\[eps(>?=)(\d+)\]/) };
+    if (!m?.raw || !m?.eps) continue;
+    measured = true;
+    const total = (x) => `${x[1] === '>=' ? 'at least ' : 'up to '}${testFolder.length + 1 + Number(x[2])}`;
+    const budget = testFolder.length + 1 + Number(m.eps[2]) - inside.length - 1;
+    p(`- Test page ${t.origin === 'file:' ? 'as a file' : 'from localhost'}: full paths ${total(m.raw)} characters written directly, ${total(m.eps)} through the EPS backend (the test folder's own path is ${testFolder.length} characters).`);
+    if (m.eps[1] === '=') p(`  The longest path inside the 25 example projects is ${inside.length} characters (\`${inside.path}\`), so in this browser a project folder whose own path is up to **${budget} characters** can be written.`);
+  }
+  if (!measured) p('Not measured (the test page did not report it).');
+  p();
   const failures = [];
   if (s1 && !s1.ok) failures.push('Step 1 failed.');
   if (s1?.contractUnchanged === false) failures.push('The contract files changed since v0.2.');
@@ -411,6 +429,22 @@ function writeReport(runDir) {
     const name = `M2-validation-report${i === 1 ? '' : `-${i}`}.md`;
     try { writeFileSync(join(runDir, name), out.join('\n'), { flag: 'wx' }); return join(runDir, name); } catch (e) { if (e.code !== 'EEXIST') throw e; }
   }
+}
+
+// The longest path of a file EPS writes (an artifact, its record or a revision) inside the example projects, relative to
+// the project folder: {length, path}. Foreign files the examples hold on purpose (conflict copies) do not count.
+function longestInsideExamples() {
+  let best = { length: 0, path: '' };
+  const written = (n) => parseRevisionName(n) || parseArtifactName(n) || (n.endsWith(RECORD_SUFFIX) && parseArtifactName(n.slice(0, -RECORD_SUFFIX.length)));
+  const walk = (dir, rel) => {
+    for (const n of readdirSync(dir)) {
+      const r = rel ? `${rel}/${n}` : n;
+      if (statSync(join(dir, n)).isDirectory()) walk(join(dir, n), r);
+      else if (written(n) && r.length > best.length) best = { length: r.length, path: r };
+    }
+  };
+  for (const ex of readdirSync(join(REPO, 'examples')).filter((n) => /^EX-\d\d-/.test(n))) walk(join(REPO, 'examples', ex, 'project'), '');
+  return best;
 }
 
 // ---------------------------------------------------------------- main

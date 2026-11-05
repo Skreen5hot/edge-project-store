@@ -33,7 +33,7 @@ Before M2, only Node and command-line tools could use a project folder. After M2
 | [`browser/*.mjs`](../browser/), [`browser/templates/`](../browser/templates/) | The pages' sources: folder access and its messages, the remembered folder, the project view, the tests |
 | [`tools/gen-pages.mjs`](../tools/gen-pages.mjs) | Bundles each page into one HTML file; `--check` is part of `npm run check` |
 | [`tools/serve-local.mjs`](../tools/serve-local.mjs) | Serves the pages on `http://localhost`, on this computer only: the local stand-in for the published page |
-| [`test/browser-backend.test.mjs`](../test/browser-backend.test.mjs), [`test/fake-fsa.mjs`](../test/fake-fsa.mjs) | 23 tests for M2, and an in-memory fake of the File System Access API; [`test/project.test.mjs`](../test/project.test.mjs) now runs its 24 writer tests on both backends |
+| [`test/browser-backend.test.mjs`](../test/browser-backend.test.mjs), [`test/fake-fsa.mjs`](../test/fake-fsa.mjs) | 25 tests for M2, and an in-memory fake of the File System Access API; [`test/project.test.mjs`](../test/project.test.mjs) now runs its 24 writer tests on both backends |
 | [`validation/m2-validate.mjs`](m2-validate.mjs), [`run-m2-validation.cmd`](run-m2-validation.cmd) | The validation assistant (also the demo): one double-click |
 | [`../MILESTONES.md`](../MILESTONES.md), this file | The finalized criteria and this validation |
 
@@ -84,6 +84,30 @@ The assistant:
 Nothing is installed, nothing is published, and nothing is sent anywhere: the pages forbid every network request
 (their Content-Security-Policy), and the local server answers only this computer.
 
+## The registrar's first run, and what changed (2026-11-05)
+
+Run `run-20261105-123113` on commit `01bf20c`, Chrome 156: everything passed except **M2-h conformance**, on both
+pages, with `NotFoundError`. The cause is **path length on Windows**, not the evaluation: the test copied each example
+deep inside the test folder, and EX-02's revision file landed at a 255-character path. Chrome created it empty, then
+failed to write it, because Chrome writes through a temporary `<file>.crswap` beside the file and that path (262
+characters) is over Windows' 260. The same examples all read correctly at shorter paths.
+
+Agreed with the registrar and done since:
+
+1. **The test page** copies the examples to short paths (`e/02`, …), so conformance tests reading; a failed copy now
+   names the file and its depth. A new measured test finds **the longest path the browser can write** in the test
+   folder, written directly and through the EPS backend; the assistant turns it into full paths and the deepest
+   project folder that works on this PC.
+2. **The browser backend** reports a file or folder that is listed but cannot be opened (what Chrome does for a path
+   that is too long) as `E-UNREADABLE` with `NotFoundError`, never as missing; the project page then explains that the
+   folder is probably too deep. A regression test fails on the earlier code.
+
+The other results of that run: the project page's reports were byte-identical to `eps report` as a file and from
+localhost (M2-a, M2-i); after a restart Chrome kept the folder **and** its permission, `granted`, on both kinds of
+page (M2-b); without folder access the page said so (M2-c); unreadable files were `NotReadableError` (M2-e); on a real
+folder `move()` **replaced** an existing file, and in the two-page race the replaced SDD was **reported**
+(`E-INTEGRITY`, `E-CURRENT-UNRESOLVED`); the two-origin fork was `conflicted`, 2 heads (M2-d).
+
 ## Results here (2026-11-05)
 
 What I could check on this PC; the registrar column is for your run.
@@ -94,17 +118,24 @@ What I could check on this PC; the registrar column is for your run.
 | M2-b | — | **not measured here** (needs a person and a restart) | |
 | M2-c | `M2-c: the page says plainly…` (missing API, insecure page, `SecurityError`, `NotAllowedError`, cancelled); Chrome started with `--disable-blink-features=FileSystemAccessLocal` shows the notice and greys out *Open* | pass; policy-managed Chrome not tried | |
 | M2-d | `M2-d (1)` (a fork across origins is `conflicted`, 2 heads); `M2-d (2)` ×3 (in the window, a replacing `move()` is reported as `E-INTEGRITY`, a refusing one loses nothing); `M2-d: across origins…` (the limit: both checks pass, the later move replaces); Chrome, private storage: **`move()` onto an existing name REPLACES it**; the two-page steps in one Chrome page: the fork is conflicted, and the race loses nothing (Web Locks) | pass in the fake and in one origin; **two origins on a picked folder not tried** | |
-| M2-e | `M2-e: …` (fake: `NotReadableError` on a file and on a folder); Chrome: a stale `File` gives `NotReadableError`, reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable` | pass | |
+| M2-e | `M2-e: …` (fake: `NotReadableError` on a file and on a folder; a listed file or folder that cannot be opened is `E-UNREADABLE (NotFoundError)`, never missing); Chrome: a stale `File` gives `NotReadableError`, reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable` | pass | |
 | M2-f | the backend tests: interface in three `move()` modes, paths refused never altered, R-W8 stale temporary files, Web Locks in one origin | pass | |
 | M2-g | `M2-g` (25 of 25 examples; EX-02 written in every `move()` mode); `test/project.test.mjs`: 24 writer tests `[browser backend]` | pass | |
-| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 7 of 7 (25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | |
+| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 8 of 8 (the path-length measurement finds no limit there, over 950 characters; 25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | |
 | M2-i | `M2-i` ×5: every example's page view equals `eps status` and its report equals `eps report` byte for byte; the folder is unchanged; the bundled code computes the same reports; no network address in the pages | pass | |
-| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **149 of 149 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | |
+| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **151 of 151 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | |
 
 The assistant itself was tested here with a stand-in for the person (answers and saved files), including stopping
 and resuming; that found and fixed one bug (a saved file taken twice when two steps followed quickly).
 
 ## Known limits
+
+- **Path length in the browser on Windows.** Chrome cannot write a file whose full path is over about 252 characters
+  directly, or, through the EPS backend's temporary file and `move()`, a little more (your run measures it). A revision
+  path inside a project is 113 characters, so **a project folder's own path must stay under about 140 characters** for
+  browser tools; Node (`eps`) has no such limit (387 characters in M1). A file the browser lists but cannot open is
+  reported as `E-UNREADABLE (NotFoundError)`, and the project page says the folder is probably too deep. The contract
+  says nothing about full paths on disk: a proposal is the registrar's decision.
 
 - **Checked, not exclusive (R-W9).** Across origins, programs or synchronizing clients, a name can be created between
   the backend's check and its `move()`. In Chrome's private storage `move()` replaces an existing file, so that

@@ -16,7 +16,7 @@ import { localLocks } from '../src/browser-backend.mjs';
 import { fakeDirectory, fakeBrowserBackend } from './fake-fsa.mjs';
 import { treeFromDisk, cloneTree, nodeAt, text } from './helpers.mjs';
 import { folderAccess, explainFolderError } from '../browser/access.mjs';
-import { projectState } from '../browser/view.mjs';
+import { projectState, hints } from '../browser/view.mjs';
 import { bundle } from '../tools/gen-pages.mjs';
 
 const run = promisify(execFile);
@@ -208,6 +208,27 @@ test('M2-e: a file the browser cannot read is E-UNREADABLE with the browser\'s e
   const listing = evaluate(await loadTree(fakeBrowserBackend({ tree: example('EX-02-chain-ok'), faults: { list: (p) => (p === 'normalized' ? 'NotReadableError' : null) } })));
   assert.ok(listing.diagnostics.some((d) => d.code === 'E-UNREADABLE' && d.path === 'normalized' && d.error === 'NotReadableError'), JSON.stringify(listing.diagnostics));
   assert.equal(listing.stages.normalized.status, 'unevaluable');
+});
+
+test('M2-e: a listed file or folder the browser cannot open (on Windows, a path too long) is E-UNREADABLE, never missing', async () => {
+  const artifact = 'sdd/sdd-20261101T100000Z-fa7eae25.jsonld';
+  const file = evaluate(await loadTree(fakeBrowserBackend({ tree: example('EX-02-chain-ok'), faults: { open: (p) => (p === artifact ? 'NotFoundError' : null) } })));
+  assert.deepEqual(file.diagnostics, [{ code: 'E-UNREADABLE', path: artifact, error: 'NotFoundError' }]);
+  assert.equal(file.stages.sdd.status, 'unevaluable');
+  const folder = evaluate(await loadTree(fakeBrowserBackend({ tree: example('EX-02-chain-ok'), faults: { open: (p) => (p === 'sdd/revisions' ? 'NotFoundError' : null) } })));
+  assert.ok(folder.diagnostics.some((d) => d.code === 'E-UNREADABLE' && d.path === 'sdd/revisions' && d.error === 'NotFoundError'), JSON.stringify(folder.diagnostics));
+  assert.equal(folder.stages.sdd.status, 'unevaluable');
+  const b = fakeBrowserBackend({ tree: example('EX-02-chain-ok') });
+  assert.equal(await b.read('sdd/not-there.jsonld'), null, 'a file that is not listed is still absent');
+  assert.equal(await b.list('sdd/not-there'), null, 'a folder that is not listed is still absent');
+});
+
+test('M2-e, M2-i: the project page explains a file it cannot open or read, and says nothing when there is nothing to explain', async () => {
+  const tooLong = evaluate(await loadTree(fakeBrowserBackend({ tree: example('EX-02-chain-ok'), faults: { open: (p) => (p.startsWith('sdd/sdd-') ? 'NotFoundError' : null) } })));
+  assert.match(hints(tooLong).join(' '), /too deep.*shorter path/s);
+  const notDownloaded = evaluate(await loadTree(fakeBrowserBackend({ tree: example('EX-02-chain-ok'), faults: { read: (p) => (p.startsWith('sdd/sdd-') ? 'NotReadableError' : null) } })));
+  assert.match(hints(notDownloaded).join(' '), /not be downloaded/);
+  assert.deepEqual(hints(evaluate(example('EX-02-chain-ok'))), []);
 });
 
 // ---------------------------------------------------------------------------------------------------------------

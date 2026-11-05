@@ -6,7 +6,8 @@
 // What it cannot reproduce is measured in a real browser instead (browser/eps-browser-tests.html, M2-h).
 //
 // Options: `move` 'replace' (move() onto an existing name replaces it), 'refuse' (it fails) or 'absent' (no move());
-// `faults.read(path)` / `faults.list(path)` return a DOMException name to throw, for unreadable files (M2-e).
+// `faults.read(path)` / `faults.list(path)` return a DOMException name to throw, for unreadable files (M2-e);
+// `faults.open(path)` makes opening a listed entry fail, as Chrome does on Windows for a path that is too long.
 
 import { browserBackend } from '../src/browser-backend.mjs';
 
@@ -30,8 +31,14 @@ class FakeDirectory {
 
   child(name) { return this.path ? `${this.path}/${name}` : name; }
 
+  openFault(name) {
+    const fault = this.ctx.faults.open?.(this.child(name));
+    if (fault) throw domError(fault, `cannot open ${this.child(name)}`);
+  }
+
   async getDirectoryHandle(name, { create = false } = {}) {
     checkName(name);
+    this.openFault(name);
     let c = this.node.entries.get(name);
     if (!c) {
       if (!create) throw domError('NotFoundError', `no folder ${this.child(name)}`);
@@ -44,6 +51,7 @@ class FakeDirectory {
 
   async getFileHandle(name, { create = false } = {}) {
     checkName(name);
+    this.openFault(name);
     let c = this.node.entries.get(name);
     if (!c) {
       if (!create) throw domError('NotFoundError', `no file ${this.child(name)}`);

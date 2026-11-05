@@ -60,6 +60,35 @@ async function* walk(dir, prefix = '') {
   }
 }
 
+// The longest path, in characters below the test folder, at which `write(dir, name)` succeeds: descends through
+// 50-character folders while a 200-character name can be written, then searches for the longest name that can.
+// {longest, limited}: the longest file path that was written; stops looking at about 800 characters.
+async function longestPath(start, startRel, write) {
+  let dir = start, rel = startRel, longest = 0;
+  const attempt = async (name) => {
+    try { await write(dir, name); } catch { return false; }
+    longest = Math.max(longest, rel.length + 1 + name.length);
+    return true;
+  };
+  for (let depth = 0; rel.length < 800; depth++) {
+    const probe = await attempt(`p${depth}-`.padEnd(200, 'x'));
+    if (probe) {
+      const sub = `d${depth}-`.padEnd(50, 'x');
+      let next = null;
+      try { next = await dir.getDirectoryHandle(sub, { create: true }); } catch { /* too deep for a folder */ }
+      if (next) { dir = next; rel = `${rel}/${sub}`; continue; }
+    }
+    // The longest name that works in this folder: between 200 and 255 if the probe worked, else below 200.
+    let lo = probe ? 200 : 0, hi = probe ? 255 : 199;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (await attempt(`n${mid}-`.padEnd(mid, 'y').slice(0, mid))) lo = mid; else hi = mid - 1;
+    }
+    return { longest, limited: true };
+  }
+  return { longest, limited: false };
+}
+
 const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
 const example = (name) => EXAMPLES.find((e) => e.name === name);
 const fixtureFile = (ex, path) => fromBase64(ex.files.find(([p]) => p === path)[1]);
@@ -126,12 +155,34 @@ async function runAutomatic(root) {
     return `move() used ${b.stats.move} time(s), direct writes ${b.stats.direct}`;
   });
 
+  await check('M2-h, measured: the longest path this browser can write in the test folder', async () => {
+    // Below the picked folder (the browser does not reveal the folder's own path): files written directly, as a
+    // simple tool would, and through the EPS backend (a short temporary file, then move()).
+    const dir = await run.getDirectoryHandle('len', { create: true });
+    const raw = await longestPath(await dir.getDirectoryHandle('raw', { create: true }), `${run.name}/len/raw`,
+      async (d, name) => writeRaw(d, name, enc('x')));
+    const eps = await longestPath(await dir.getDirectoryHandle('eps', { create: true }), `${run.name}/len/eps`,
+      async (d, name) => browserBackend(d).create(name, enc('x')));
+    const show = (x) => (x.limited ? `up to ${x.longest}` : `at least ${x.longest} (no limit found)`);
+    return `below the test folder: written directly ${show(raw)} characters; through the EPS backend ${show(eps)} characters `
+      + `[raw${raw.limited ? '=' : '>='}${raw.longest}] [eps${eps.limited ? '=' : '>='}${eps.longest}]`;
+  });
+
   await check('M2-h conformance: every example read through the real API equals its expected report', async () => {
-    const dir = await run.getDirectoryHandle('examples', { create: true });
+    // The examples are copied to short paths (e/02, e/03, …): this test is about reading, not path length.
+    const dir = await run.getDirectoryHandle('e', { create: true });
     const failed = [];
     for (const ex of EXAMPLES) {
-      const root = await dir.getDirectoryHandle(ex.name, { create: true });
-      for (const [path, b64] of ex.files) await writeRaw(root, path, fromBase64(b64));
+      const short = ex.name.slice(3, 5);
+      const root = await dir.getDirectoryHandle(short, { create: true });
+      for (const [path, b64] of ex.files) {
+        try {
+          await writeRaw(root, path, fromBase64(b64));
+        } catch (e) {
+          const rel = `${run.name}/e/${short}/${path}`;
+          throw new Error(`copying ${ex.name}/${path} failed (${e?.name}: ${e?.message}); it is ${rel.length} characters below the test folder`);
+        }
+      }
       const report = evaluate(await loadTree(browserBackend(root)));
       if (dec(canonicalBytes(report)) !== ex.expected) failed.push(ex.name);
     }
@@ -207,8 +258,8 @@ async function runAutomatic(root) {
   await check('R-W8: the backend left no temporary file in the run folder', async () => {
     const left = [];
     for await (const [path] of walk(run)) {
-      // examples/ holds copies of the fixtures, and EX-10 has a temporary file on purpose (an interrupted commit).
-      if (!path.startsWith('examples/') && path.split('/').at(-1).startsWith(TEMP_PREFIX)) left.push(path);
+      // e/ holds copies of the fixtures, and EX-10 has a temporary file on purpose (an interrupted commit).
+      if (!path.startsWith('e/') && path.split('/').at(-1).startsWith(TEMP_PREFIX)) left.push(path);
     }
     expect(!left.length, `left behind: ${left.join(', ')}`);
     return 'none';
