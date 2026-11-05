@@ -110,18 +110,18 @@ Results are from this PC on 2026-11-03. The registrar column is for your result.
 
 | AC | Criterion (from MILESTONES.md) | Evidence | Result here | Registrar |
 |---|---|---|---|---|
-| M1-1 | Exclusive: a create never replaces an existing name, also against another process | `backend interface` ×3; `M1-1: two processes racing…` in link and wx modes: 40 names, each with exactly one winner whose bytes survive | pass | |
-| M1-2 | Temp file, fsync, `link()`; `wx` where links are unavailable; never `rename()` onto a final name | `M1-2: auto mode uses hard links…`, which also checks that the only `rename` in the backend is in `replace()` (work files) | pass | |
-| M1-3 | The writer behaves on disk as in memory; EX-02 written to disk equals the fixture | `M1-3: writing EX-02 to disk…` in link and wx modes; the 21 memory-backend writer tests unchanged | pass | |
-| M1-4 | Every example read from disk equals its expected report | `M1-4: every example read from disk…` (25 of 25) | pass | |
-| M1-5 | Links are never followed | `M1-5` ×2: a junction is W-FOREIGN-FILE, reads through it find nothing, writes through it are refused, an input through it is INPUT-MISSING, and a stage folder that is a junction is absent and cannot be written | pass | |
-| M1-6 | A killed process leaves only §10 states; rerunning completes | `M1-6: killed before the record` (W-UNREGISTERED) and `…before the revision` (W-UNCOMMITTED); in both, the rerun ends `ok` with no diagnostics | pass | |
-| M1-7 | Own temporary files removed; stale ones (over an hour) removed on the next write; fresh ones kept | `M1-7` and the `backend interface` tests | pass | |
-| M1-8 | `eps` commands; `report` identical to the library; exit codes 0/1/2 | `M1-8` ×3: `report` equals `expected.jsonld` for 7 examples; exit codes; a full fork-and-merge; usage errors; and the demo (step 2) | pass | |
-| M1-9 | In OneDrive on this PC: `link()` and `wx` refuse existing names; paths over 260 characters work | the probe below; the 32 disk and unreadable-file tests passed inside a OneDrive folder | pass | |
-| M1-10 | Two PCs synchronizing through OneDrive: the fork is reported and merged; a file not downloaded while offline is reported, not fatal; temporary files seen | step 3 | **not run here: needs two PCs** | |
-| M1-11 | Work files: a rename refused for a moment is retried for about 1.5 s, then fails cleanly; other errors are not retried | `item 4: replace() retries…`: two refusals then success; constant EPERM fails after 1.4–5 s with the old file intact and no temporary file left; ENOSPC fails at once | pass | |
-| M1-12 | A file that cannot be read is reported (E-UNREADABLE with its error), what depends on it is not evaluable, and `eps` exits 1 instead of crashing | 15 `R-E10…` and loader tests in `test/unreadable.test.mjs` (project file, artifact, record, revision, stage folder, source, history, a cited subfolder file, files never read); `eps: an unreadable file exits 1…` | pass | |
+| M1-1 | Exclusive: a create never replaces an existing name, also against another process | `backend interface` ×3; `M1-1: two processes racing…` in link and wx modes: 40 names, each with exactly one winner whose bytes survive | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-2 | Temp file, fsync, `link()`; `wx` where links are unavailable; never `rename()` onto a final name | `M1-2: auto mode uses hard links…`, which also checks that the only `rename` in the backend is in `replace()` (work files) | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-3 | The writer behaves on disk as in memory; EX-02 written to disk equals the fixture | `M1-3: writing EX-02 to disk…` in link and wx modes; the 21 memory-backend writer tests unchanged | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-4 | Every example read from disk equals its expected report | `M1-4: every example read from disk…` (25 of 25) | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-5 | Links are never followed | `M1-5` ×2: a junction is W-FOREIGN-FILE, reads through it find nothing, writes through it are refused, an input through it is INPUT-MISSING, and a stage folder that is a junction is absent and cannot be written | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-6 | A killed process leaves only §10 states; rerunning completes | `M1-6: killed before the record` (W-UNREGISTERED) and `…before the revision` (W-UNCOMMITTED); in both, the rerun ends `ok` with no diagnostics | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-7 | Own temporary files removed; stale ones (over an hour) removed on the next write; fresh ones kept | `M1-7` and the `backend interface` tests | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-8 | `eps` commands; `report` identical to the library; exit codes 0/1/2 | `M1-8` ×3: `report` equals `expected.jsonld` for 7 examples; exit codes; a full fork-and-merge; usage errors; and the demo (step 2) | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-9 | In OneDrive on this PC: `link()` and `wx` refuse existing names; paths over 260 characters work | the probe below; the 32 disk and unreadable-file tests passed inside a OneDrive folder | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-10 | Two PCs synchronizing through OneDrive: the fork is reported and merged; a file not downloaded while offline is reported, not fatal; temporary files seen | step 3 | **not run here: needs two PCs** || pass: run `run-20261105-082808` on two PCs; rows 1–13 as expected, row 14 none seen |
+| M1-11 | Work files: a rename refused for a moment is retried for about 1.5 s, then fails cleanly; other errors are not retried | `item 4: replace() retries…`: two refusals then success; constant EPERM fails after 1.4–5 s with the old file intact and no temporary file left; ENOSPC fails at once | pass || pass (both PCs, run `run-20261105-082808`) |
+| M1-12 | A file that cannot be read is reported (E-UNREADABLE with its error), what depends on it is not evaluable, and `eps` exits 1 instead of crashing | 15 `R-E10…` and loader tests in `test/unreadable.test.mjs` (project file, artifact, record, revision, stage folder, source, history, a cited subfolder file, files never read); `eps: an unreadable file exits 1…` | pass || pass (both PCs, run `run-20261105-082808`) |
 
 ### The probe on this PC
 
@@ -165,8 +165,8 @@ Node here. The browser's limits are checked in M2.
 
 | | |
 |---|---|
-| Step 1 (automated checks) | ☐ pass ☐ fail — notes: |
-| Step 2 (demo) | ☐ pass ☐ fail — notes: |
-| Step 3 (two PCs) | ☐ pass ☐ fail ☐ not run — notes: |
-| M1 accepted | ☐ yes ☐ yes, with conditions ☐ no |
-| Registrar, date | |
+| Step 1 (automated checks) | ☒ pass ☐ fail — notes: on both PCs, 102 of 102 tests, 32 of 32 disk tests inside OneDrive, probe as expected (link and wx refuse existing names; paths of 398 and 399 characters work) |
+| Step 2 (demo) | ☒ pass ☐ fail — notes: `DEMO PASSED` on both PCs |
+| Step 3 (two PCs) | ☒ pass ☐ fail ☐ not run — notes: run `run-20261105-082808` with the validation assistant (`validation/m1-validate.mjs`, commit `0e0fed3`), on LittleMan (Node v24.11.1) and LAPTOP-7TI8ACET (Node v25.2.1); its report and evidence stay in the run folder in OneDrive, outside the repository. Row 9: `sdd conflicted, 2 heads`, `E-STAGE-CONFLICT`, exit 1, no `E-INTEGRITY`, no `W-INTERRUPTED-REVISION`, no conflict copies. Row 12: one file freed up (cloud-only) and the PC confirmed offline; `E-UNREADABLE` with error `UNKNOWN` for that file and for the merged-out SDD from PC 2 (not freed by hand; why it was also cloud-only is not known), `sdd unevaluable`, exit 1, no crash. Row 13: clean. Row 14: no `W-TEMP-FILE` and no temporary files seen. Both windows were closed and restarted during the run and continued where they stopped |
+| M1 accepted | ☒ yes ☐ yes, with conditions ☐ no |
+| Registrar, date | Aaron Damiano, 2026-11-05 |
