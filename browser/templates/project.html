@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:">
+<title>EPS project</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #1d1d1f; --muted: #5f6368; --line: #d0d4da; --ok: #16794a; --warn: #a14e00; --bad: #b3261e; --code: #f4f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17181a; --fg: #e8e9eb; --muted: #a0a4ab; --line: #3a3d42; --ok: #4cc38a; --warn: #f0a050; --bad: #ff7b72; --code: #22252a; } }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0 auto; max-width: 60rem; padding: 1.5rem 1rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  .lead, footer, #remembered { color: var(--muted); }
+  button { font: inherit; padding: .5rem 1rem; border-radius: .4rem; border: 1px solid var(--line); background: var(--code); color: var(--fg); cursor: pointer; }
+  button.primary { background: #1a5fd0; border-color: #1a5fd0; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: .4rem; padding: 1rem; overflow-x: auto; font-size: .85rem; }
+  code { font-size: .85rem; word-break: break-all; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .notice { border: 1px solid var(--warn); border-radius: .4rem; padding: .75rem 1rem; }
+</style>
+</head>
+<body>
+<h1>EPS project</h1>
+<p class="lead">Opens a project folder and shows its state, as <code>eps status</code> does. This page only reads: it never changes the folder, and nothing is sent anywhere.</p>
+<p id="access" class="notice warn" hidden></p>
+<div class="actions">
+  <button id="open" class="primary">Open a project folder…</button>
+  <button id="reopen" hidden>Reopen</button>
+  <button id="refresh" hidden>Read it again</button>
+  <button id="save" hidden>Save the report…</button>
+</div>
+<p id="remembered"></p>
+<p id="message" role="status"></p>
+<section id="result" hidden>
+  <h2>Folder <span id="folder"></span></h2>
+  <p id="verdict"></p>
+  <pre id="status"></pre>
+  <p>Report SHA-256 (the same as for <code>eps report</code> on this folder): <code id="sha"></code><br>Read <span id="read-at"></span>.</p>
+</section>
+<footer>Page <span id="origin"></span>. Generated from the edge-project-store repository; contract EPS v0.2.</footer>
+<!-- EPS:SCRIPT -->
+</body>
+</html>

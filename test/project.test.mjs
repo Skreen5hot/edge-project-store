@@ -1,15 +1,23 @@
-// Unit tests for the project API (src/project.mjs) over the memory backend: the writer rules (EPS §8), the recovery
-// table (§10) and the loader. These are independent of the fixtures except where a fixture is the starting folder.
+// Unit tests for the project API (src/project.mjs): the writer rules (EPS §8), the recovery table (§10) and the
+// loader. These are independent of the fixtures except where a fixture is the starting folder.
+//
+// The same tests run twice: on the memory backend, and on the browser backend over a fake of the File System Access
+// API (test/fake-fsa.mjs, M2-g), whose test names end in [browser backend]. Inside the loop below, `memoryBackend`
+// names whichever backend is under test; the body is left unindented so that it reads as before.
 
-import test from 'node:test';
+import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { evaluate, canonicalBytes, sha256 } from '../src/contract.mjs';
 import { loadTree, createProject, openProject, EpsWriteError } from '../src/project.mjs';
-import { memoryBackend } from '../src/memory-backend.mjs';
+import { memoryBackend as memory } from '../src/memory-backend.mjs';
+import { fakeBrowserBackend } from './fake-fsa.mjs';
 import { treeFromDisk, cloneTree, nodeAt, put, text, textOf } from './helpers.mjs';
+
+for (const [suffix, memoryBackend] of [['', memory], [' [browser backend]', fakeBrowserBackend]]) {
+const test = (name, fn) => nodeTest(name + suffix, fn);
 
 const examples = join(dirname(fileURLToPath(import.meta.url)), '..', 'examples');
 const example = (name) => treeFromDisk(join(examples, name, 'project'));
@@ -425,3 +433,4 @@ for (const [label, occupant] of [['a folder', { type: 'dir', entries: new Map() 
     assert.ok(inner.log.slice(n).every(([op, p]) => op === 'create' && p.includes('T090001Z')), 'only new names were created');
   });
 }
+} // the backends

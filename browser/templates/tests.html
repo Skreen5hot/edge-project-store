@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:">
+<title>EPS browser tests</title>
+<style>
+  :root { color-scheme: light dark; --bg: #fff; --fg: #1d1d1f; --muted: #5f6368; --line: #d0d4da; --ok: #16794a; --bad: #b3261e; --code: #f4f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17181a; --fg: #e8e9eb; --muted: #a0a4ab; --line: #3a3d42; --ok: #4cc38a; --bad: #ff7b72; --code: #22252a; } }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0 auto; max-width: 64rem; padding: 1.5rem 1rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  .lead, footer, #run { color: var(--muted); }
+  button { font: inherit; padding: .45rem .9rem; border-radius: .4rem; border: 1px solid var(--line); background: var(--code); color: var(--fg); cursor: pointer; }
+  button.primary { background: #1a5fd0; border-color: #1a5fd0; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  td { border-top: 1px solid var(--line); padding: .4rem .5rem; vertical-align: top; }
+  td:last-child { white-space: pre-wrap; word-break: break-word; color: var(--muted); }
+  ol li { margin: .35rem 0; }
+  pre, #two-message { background: var(--code); border: 1px solid var(--line); border-radius: .4rem; padding: .75rem 1rem; white-space: pre-wrap; font-size: .85rem; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .bad { color: var(--bad); font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>EPS browser tests</h1>
+<p class="lead">Runs the browser backend against a real folder through this browser's File System Access API. Pick an empty test folder: everything is written inside new folders in it (<code>eps-browser-test-…</code>, <code>two-page-…</code>, <code>race-…</code>), and nothing else is touched. Nothing is sent anywhere.</p>
+<div class="actions">
+  <button id="pick" class="primary">Pick the test folder…</button>
+  <button id="auto" class="needs-folder" disabled>Run the automatic tests</button>
+  <button id="save">Save the results…</button>
+</div>
+<p id="folder"></p>
+<p id="run"></p>
+<p id="summary"></p>
+<table><tbody id="rows"></tbody></table>
+
+<h2>Two pages, two origins (M2-d)</h2>
+<p>Open this page twice: once as a file (page 1) and once from <code>http://localhost</code> (page 2), pick the <b>same</b> test folder on both, then press the steps in order, on the page named.</p>
+<ol>
+  <li>Page 1: <button id="fork-1" class="needs-folder" disabled>1. Create the two-page project</button></li>
+  <li>Page 2: <button id="fork-2" class="needs-folder" disabled>2. Commit an SDD, pausing before its revision</button></li>
+  <li>Page 1: <button id="fork-3" class="needs-folder" disabled>3. Commit another SDD</button></li>
+  <li>Page 2: press <b>Continue</b> below (4).</li>
+  <li>Either page: <button id="fork-check" class="needs-folder" disabled>5. Check: two heads, conflicted</button></li>
+  <li>Page 1: <button id="race-1" class="needs-folder" disabled>6. Create the race project</button></li>
+  <li>Page 2: <button id="race-2" class="needs-folder" disabled>7. Check a name is free, pausing before move()</button></li>
+  <li>Page 1: <button id="race-3" class="needs-folder" disabled>8. Commit an SDD under that name</button></li>
+  <li>Page 2: press <b>Continue</b> below (9).</li>
+  <li>Either page: <button id="race-check" class="needs-folder" disabled>10. Check: refused, or detected</button></li>
+</ol>
+<div class="actions"><button id="continue" disabled>Continue</button></div>
+<div id="two-message" role="status">Not started.</div>
+<footer>Page <span id="origin"></span>. Generated from the edge-project-store repository; contract EPS v0.2.</footer>
+<!-- EPS:SCRIPT -->
+</body>
+</html>
