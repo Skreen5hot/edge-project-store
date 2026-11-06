@@ -1928,6 +1928,13 @@ const __eps_src_browser_backend_mjs = (() => {
 const { TEMP_PREFIX } = __eps_src_contract_mjs;
 
 const STALE_TEMP_MS = 60 * 60 * 1000;
+// A write can be interrupted for a moment when another program touches the new file, for example OneDrive picking
+// it up to synchronize it: Chrome then fails close() with InvalidStateError (seen in the registrar's run). Such a
+// write is retried with a fresh temporary file, 50 ms doubling, about 1.5 s in all, as the Node backend retries a
+// briefly refused rename (M1-11). No final name is touched until the move, so a retry cannot replace anything.
+const WRITE_RETRYABLE = new Set(['InvalidStateError', 'NoModificationAllowedError']);
+const WRITE_RETRIES = 5;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const absent = (e) => e?.name === 'NotFoundError' || e?.name === 'TypeMismatchError';
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
@@ -1974,7 +1981,7 @@ function randomHex(n) {
  * before the move, so a test can play another origin writing in that window; `now`, the clock for R-W8 (tests).
  */
 function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLocks, lockScope = 'eps', hooks = {}, now = () => Date.now() } = {}) {
-  const stats = { move: 0, direct: 0 };
+  const stats = { move: 0, direct: 0, retries: 0 };
 
   // Whether `dir` lists an entry `name` of `kind` ('file' or 'directory'). A listed entry that cannot be opened is not
   // absent: on Windows, Chrome lists files whose full path is too long to open, and answers NotFoundError for them.
@@ -2022,6 +2029,19 @@ function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLo
     }
   }
 
+  // Runs `write`, again after an interrupted write (WRITE_RETRYABLE), at most WRITE_RETRIES more times.
+  async function retrying(write) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await write();
+      } catch (e) {
+        if (!WRITE_RETRYABLE.has(e?.name) || attempt >= WRITE_RETRIES) throw e;
+        stats.retries++;
+        await sleep(50 * 2 ** attempt);
+      }
+    }
+  }
+
   // R-W8: removes temporary files over an hour old from a folder; a younger one may be a write in progress elsewhere.
   async function removeStaleTemps(dir) {
     for await (const [name, handle] of dir.entries()) {
@@ -2066,12 +2086,21 @@ function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLo
         if (hooks.beforeCreate) await hooks.beforeCreate(path, bytes);
         const dir = await folder(parts.slice(0, -1), true);
         if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
-        const tempName = `${TEMP_PREFIX}${randomHex(6)}`;
-        const temp = await dir.getFileHandle(tempName, { create: true });
-        let moved = false;
+        let tempName = null, moved = false;
         try {
+          const temp = await retrying(async () => {
+            tempName = `${TEMP_PREFIX}${randomHex(6)}`;
+            const handle = await dir.getFileHandle(tempName, { create: true });
+            try {
+              if (typeof handle.move === 'function') await writeAll(handle, bytes);
+              return handle;
+            } catch (e) {
+              try { await dir.removeEntry(tempName); } catch { /* not there */ }
+              tempName = null;
+              throw e;
+            }
+          });
           if (typeof temp.move === 'function') {
-            await writeAll(temp, bytes);
             // The check (R-W9, checked): as close to the move as the API allows.
             if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
             if (hooks.beforeMove) await hooks.beforeMove(path);
@@ -2088,11 +2117,11 @@ function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLo
             // practice avoids partial files, but that is browser behaviour, not a guarantee (§11).
             if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
             if (hooks.beforeMove) await hooks.beforeMove(path);
-            await writeAll(await dir.getFileHandle(name, { create: true }), bytes);
+            await retrying(async () => writeAll(await dir.getFileHandle(name, { create: true }), bytes));
             stats.direct++;
           }
         } finally {
-          if (!moved) { try { await dir.removeEntry(tempName); } catch { /* not there */ } }
+          if (!moved && tempName) { try { await dir.removeEntry(tempName); } catch { /* not there */ } }
           await removeStaleTemps(dir).catch(() => {});
         }
       });
@@ -2103,7 +2132,7 @@ function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLo
       return locks.request(`${lockScope}:${parts.join('/')}`, async () => {
         const dir = await folder(parts.slice(0, -1), true);
         if ((await kindOf(dir, name)) === 'dir') throw fail('NOT-A-FILE', `not a file: ${path}`);
-        await writeAll(await dir.getFileHandle(name, { create: true }), bytes);
+        await retrying(async () => writeAll(await dir.getFileHandle(name, { create: true }), bytes));
       });
     },
   };
@@ -2243,13 +2272,42 @@ async function newFolder(parent, prefix) {
   return parent.getDirectoryHandle(name, { create: true });
 }
 
+// Writes a file directly (not through the backend), retrying an interrupted write as the backend does, and keeps
+// count: {writes, retries, ms (all writes), slowest}. `raw.once` is the plain write, without retries.
+const rawStats = { writes: 0, retries: 0, ms: 0, slowest: 0 };
 async function writeRaw(root, path, bytes) {
   const parts = path.split('/');
   let dir = root;
   for (const s of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(s, { create: true });
-  const w = await (await dir.getFileHandle(parts.at(-1), { create: true })).createWritable();
-  await w.write(bytes);
-  await w.close();
+  const t0 = performance.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const w = await (await dir.getFileHandle(parts.at(-1), { create: true })).createWritable();
+      await w.write(bytes);
+      await w.close();
+      break;
+    } catch (e) {
+      if (!['InvalidStateError', 'NoModificationAllowedError'].includes(e?.name) || attempt >= 5) throw e;
+      rawStats.retries++;
+      await new Promise((r) => setTimeout(r, 50 * 2 ** attempt));
+    }
+  }
+  const ms = performance.now() - t0;
+  rawStats.writes++;
+  rawStats.ms += ms;
+  rawStats.slowest = Math.max(rawStats.slowest, ms);
+}
+const timing = (st) => `${st.writes} writes, ${st.retries} interrupted write(s) retried, ${Math.round(st.ms / Math.max(1, st.writes))} ms each on average, slowest ${Math.round(st.slowest)} ms`;
+
+// The backend with each create and replace timed, for the same figures.
+function timedBackend(dir) {
+  const b = browserBackend(dir);
+  const st = { writes: 0, ms: 0, slowest: 0 };
+  const timed = (fn) => async (...args) => {
+    const t0 = performance.now();
+    try { return await fn(...args); } finally { const ms = performance.now() - t0; st.writes++; st.ms += ms; st.slowest = Math.max(st.slowest, ms); }
+  };
+  return Object.assign(b, { create: timed(b.create), replace: timed(b.replace), timing: () => timing({ ...st, retries: b.stats.retries }) });
 }
 
 async function readRaw(root, path) {
@@ -2376,6 +2434,7 @@ async function runAutomatic(root) {
   });
 
   await check('M2-h conformance: every example read through the real API equals its expected report', async () => {
+    Object.assign(rawStats, { writes: 0, retries: 0, ms: 0, slowest: 0 });
     // The examples are copied to short paths (e/02, e/03, …): this test is about reading, not path length.
     const dir = await run.getDirectoryHandle('e', { create: true });
     const failed = [];
@@ -2395,12 +2454,12 @@ async function runAutomatic(root) {
     }
     expect(EXAMPLES.length === 25, `25 examples (found ${EXAMPLES.length})`);
     expect(!failed.length, `differs from expected.jsonld: ${failed.join(', ')}`);
-    return `${EXAMPLES.length} of ${EXAMPLES.length} equal, byte for byte`;
+    return `${EXAMPLES.length} of ${EXAMPLES.length} equal, byte for byte. Copying them: ${timing(rawStats)}`;
   });
 
   await check('M2-h writer: EX-02 written through the real API reproduces the fixture', async () => {
     const root = await run.getDirectoryHandle('writer-ex02', { create: true });
-    const b = browserBackend(root);
+    const b = timedBackend(root);
     const ex = await writeEx02(b);
     let n = 0;
     for (const [path] of ex.files.filter(([p]) => /^(source|normalized|sdd)\/[^/]+$/.test(p) || p === 'edge-project.jsonld')) {
@@ -2409,7 +2468,7 @@ async function runAutomatic(root) {
     }
     const r = evaluate(await loadTree(b));
     expect(codes(r).length === 0 && r.stages.sdd.status === 'ok', `clean (${codes(r).join(', ')})`);
-    return `${n} files equal the fixture; the project is clean; move() ${b.stats.move}, direct ${b.stats.direct}`;
+    return `${n} files equal the fixture; the project is clean; move() ${b.stats.move}, direct ${b.stats.direct}. Writing them through the EPS backend: ${b.timing()}`;
   });
 
   await check('same origin: two writers racing for the same names never overwrite each other (Web Locks)', async () => {
@@ -2509,7 +2568,16 @@ async function startProject(prefix) {
 
 const sddArgs = (normalized, text, createdAt) => ({ createdAt, artifacts: [{ role: 'sdd', kind: 'sdd', ext: 'jsonld', generation: 'assisted',
   bytes: enc(text), inputs: [{ role: 'structure', relation: 'dependency', path: normalized }] }] });
-const normalizedOf = async (b) => evaluate(await loadTree(b)).stages.normalized.current[0];
+// The normalized schema of a two-page or race project, or a plain explanation if the other page has not finished
+// creating it (creating takes several seconds per file in a synchronized folder).
+// Checked before anything opens the project: a project caught while the other page creates it may have no project
+// file yet, an incomplete one, or no normalized schema.
+async function normalizedOf(dir, created) {
+  const r = evaluate(await loadTree(browserBackend(dir)));
+  const n = r.valid ? r.stages.normalized.current[0] : undefined;
+  if (!n) throw new Error(`The project from step ${created} (${dir.name}) is not finished yet. Wait until the other page says "Step ${created} done", then press this step again.`);
+  return n;
+}
 
 const twoPageSteps = {
   // Fork: two pages commit from the same head.
@@ -2519,15 +2587,15 @@ const twoPageSteps = {
   },
   async 'fork-2'() {
     const dir = await newestFolder('two-page');
+    const normalized = await normalizedOf(dir, 1);
     const b = browserBackend(dir, { hooks: { beforeCreate: (path) => (path.startsWith('sdd/revisions/') ? pauseHere(`${dir.name}: this page's SDD is written, its revision is not`) : undefined) } });
-    const p = await openProject(b, TOOLS.sdd);
-    await p.commit('sdd', sddArgs(await normalizedOf(b), '{"written": "page 2, step 2"}\n'));
+    await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(normalized, '{"written": "page 2, step 2"}\n'));
     twoPage(`Step 4 done: this page's revision is written in ${dir.name}. Press step 5 on either page.`, 'ok');
   },
   async 'fork-3'() {
     const dir = await newestFolder('two-page');
-    const b = browserBackend(dir);
-    await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(await normalizedOf(b), '{"written": "page 1, step 3"}\n'));
+    const normalized = await normalizedOf(dir, 1);
+    await (await openProject(browserBackend(dir), TOOLS.sdd)).commit('sdd', sddArgs(normalized, '{"written": "page 1, step 3"}\n'));
     twoPage(`Step 3 done: committed an SDD in ${dir.name}. Now press "Continue" on the other page.`, 'ok');
   },
   async 'fork-check'() {
@@ -2547,6 +2615,7 @@ const twoPageSteps = {
   async 'race-2'() {
     const dir = await newestFolder('race');
     const name = artifactName('sdd', RACE_TIME, sha256(enc(RACE_TEXT)), 8, 'jsonld');
+    await normalizedOf(dir, 6);
     const b = browserBackend(dir, { hooks: { beforeMove: () => pauseHere(`${dir.name}: this page checked that sdd/${name} is free and is about to move its file there`) } });
     try {
       await b.create(`sdd/${name}`, enc('{"written": "page 2, other bytes under the same name"}\n'));
@@ -2557,8 +2626,8 @@ const twoPageSteps = {
   },
   async 'race-3'() {
     const dir = await newestFolder('race');
-    const b = browserBackend(dir);
-    const { artifacts } = await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(await normalizedOf(b), RACE_TEXT, RACE_TIME));
+    const normalized = await normalizedOf(dir, 6);
+    const { artifacts } = await (await openProject(browserBackend(dir), TOOLS.sdd)).commit('sdd', sddArgs(normalized, RACE_TEXT, RACE_TIME));
     twoPage(`Step 8 done: committed ${artifacts[0].path} in ${dir.name}. Now press "Continue" on the other page.`, 'ok');
   },
   async 'race-check'() {
@@ -2618,7 +2687,11 @@ function setup() {
   $('continue').onclick = () => { $('continue').disabled = true; const p = paused; paused = null; p?.resume(); };
   for (const [id, step] of Object.entries(twoPageSteps)) {
     $(id).onclick = async () => {
-      try { await step(); } catch (e) { twoPage(`${e?.message ?? e}`, 'bad'); }
+      // One step at a time: the buttons wait while a step works (a step can take a minute in a synchronized folder).
+      const buttons = Object.keys(twoPageSteps).map((k) => $(k));
+      for (const b of buttons) b.disabled = true;
+      twoPage(`Working on step "${$(id).textContent}"… This can take up to a minute in a OneDrive folder: wait for its "done" message.`);
+      try { await step(); } catch (e) { twoPage(`${e?.message ?? e}`, 'bad'); } finally { for (const b of buttons) b.disabled = !scratch; }
     };
   }
 }

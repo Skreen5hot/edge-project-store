@@ -33,7 +33,7 @@ Before M2, only Node and command-line tools could use a project folder. After M2
 | [`browser/*.mjs`](../browser/), [`browser/templates/`](../browser/templates/) | The pages' sources: folder access and its messages, the remembered folder, the project view, the tests |
 | [`tools/gen-pages.mjs`](../tools/gen-pages.mjs) | Bundles each page into one HTML file; `--check` is part of `npm run check` |
 | [`tools/serve-local.mjs`](../tools/serve-local.mjs) | Serves the pages on `http://localhost`, on this computer only: the local stand-in for the published page |
-| [`test/browser-backend.test.mjs`](../test/browser-backend.test.mjs), [`test/fake-fsa.mjs`](../test/fake-fsa.mjs) | 25 tests for M2, and an in-memory fake of the File System Access API; [`test/project.test.mjs`](../test/project.test.mjs) now runs its 24 writer tests on both backends |
+| [`test/browser-backend.test.mjs`](../test/browser-backend.test.mjs), [`test/fake-fsa.mjs`](../test/fake-fsa.mjs) | 30 tests for M2, and an in-memory fake of the File System Access API; [`test/project.test.mjs`](../test/project.test.mjs) now runs its 24 writer tests on both backends |
 | [`validation/m2-validate.mjs`](m2-validate.mjs), [`run-m2-validation.cmd`](run-m2-validation.cmd) | The validation assistant (also the demo): one double-click |
 | [`../MILESTONES.md`](../MILESTONES.md), this file | The finalized criteria and this validation |
 
@@ -108,6 +108,32 @@ page (M2-b); without folder access the page said so (M2-c); unreadable files wer
 folder `move()` **replaced** an existing file, and in the two-page race the replaced SDD was **reported**
 (`E-INTEGRITY`, `E-CURRENT-UNRESOLVED`); the two-origin fork was `conflicted`, 2 heads (M2-d).
 
+## The registrar's second run, and what changed (2026-11-06)
+
+Run `run-20261105-161028` on commit `952df69`: the path-length measurement worked (Chrome wrote full paths up to 252
+characters directly and 259 through the EPS backend; with a 113-character revision path, a project folder up to
+**145 characters** deep works on this PC). Two new failures, neither in the evaluation:
+
+1. **Conformance** stopped with `InvalidStateError` on a newly created file, left empty, at a different example on
+   each page (EX-04, EX-09): the file changed on disk between its creation and the end of Chrome's write, most likely
+   OneDrive picking the new file up to synchronize it (the test folder is in OneDrive). Each file Chrome wrote there
+   took **about 5–7 seconds**.
+2. **The two-page test** could not pass step 2 (`input path undefined`): step 1 was still writing its project (30–40
+   seconds in OneDrive) and the page did not show it was busy.
+
+A message in Chrome's developer tools about `/.well-known/appspecific/com.chrome.devtools.json` was Chrome's own
+request, blocked by the pages' policy against any network access: harmless, and not from EPS.
+
+Agreed with the registrar and done since:
+
+1. **The browser backend retries an interrupted write** (`InvalidStateError`, `NoModificationAllowedError`) with a
+   fresh temporary file, 50 ms doubling, about 1.5 s in all, like the Node backend's retry (M1-11); no final name is
+   touched before the move, so a retry cannot replace anything. `replace()` retries the same way. Regression tests
+   fail on the earlier code. The test page's own copying retries the same way, and the conformance and writer tests
+   now report how many writes were retried and how long each took.
+2. **The two-page steps** show "Working…" and wait for each other; steps 2, 3, 7 and 8 say plainly when the other
+   page's project is not finished yet, instead of failing.
+
 ## Results here (2026-11-05)
 
 What I could check on this PC; the registrar column is for your run.
@@ -121,14 +147,18 @@ What I could check on this PC; the registrar column is for your run.
 | M2-e | `M2-e: …` (fake: `NotReadableError` on a file and on a folder; a listed file or folder that cannot be opened is `E-UNREADABLE (NotFoundError)`, never missing); Chrome: a stale `File` gives `NotReadableError`, reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable` | pass | |
 | M2-f | the backend tests: interface in three `move()` modes, paths refused never altered, R-W8 stale temporary files, Web Locks in one origin | pass | |
 | M2-g | `M2-g` (25 of 25 examples; EX-02 written in every `move()` mode); `test/project.test.mjs`: 24 writer tests `[browser backend]` | pass | |
-| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 8 of 8 (the path-length measurement finds no limit there, over 950 characters; 25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | |
+| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 8 of 8 (the path-length measurement finds no limit there, over 950 characters; 298 copies at 15 ms each, none retried; 25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | |
 | M2-i | `M2-i` ×5: every example's page view equals `eps status` and its report equals `eps report` byte for byte; the folder is unchanged; the bundled code computes the same reports; no network address in the pages | pass | |
-| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **151 of 151 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | |
+| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **156 of 156 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | |
 
 The assistant itself was tested here with a stand-in for the person (answers and saved files), including stopping
 and resuming; that found and fixed one bug (a saved file taken twice when two steps followed quickly).
 
 ## Known limits
+
+- **Writing in a OneDrive folder from Chrome is slow** (about 5–7 seconds per file in the registrar's second run) and
+  can be interrupted for a moment (retried, as above). A commit writes three files or more, so a browser tool saving
+  into OneDrive should show that it is working. The registrar's next run measures it.
 
 - **Path length in the browser on Windows.** Chrome cannot write a file whose full path is over about 252 characters
   directly, or, through the EPS backend's temporary file and `move()`, a little more (your run measures it). A revision

@@ -7,7 +7,8 @@
 //
 // Options: `move` 'replace' (move() onto an existing name replaces it), 'refuse' (it fails) or 'absent' (no move());
 // `faults.read(path)` / `faults.list(path)` return a DOMException name to throw, for unreadable files (M2-e);
-// `faults.open(path)` makes opening a listed entry fail, as Chrome does on Windows for a path that is too long.
+// `faults.open(path)` makes opening a listed entry fail, as Chrome does on Windows for a path that is too long;
+// `faults.close(path)` makes a write fail on close(), as Chrome does when another program touched the file.
 
 import { browserBackend } from '../src/browser-backend.mjs';
 
@@ -128,6 +129,8 @@ class FakeFile {
       close: async () => {
         if (!open) throw new TypeError('the writable is closed');
         open = false;
+        const fault = this.ctx.faults.close?.(this.path);
+        if (fault) throw domError(fault, `the write to ${this.path} was interrupted`); // the file stays as it was (empty when new)
         let c = this.parent.node.entries.get(this.name);
         if (c?.type === 'file') c.bytes = data;
         else this.parent.node.entries.set(this.name, c = { type: 'file', bytes: data });

@@ -17,6 +17,13 @@
 import { TEMP_PREFIX } from './contract.mjs';
 
 const STALE_TEMP_MS = 60 * 60 * 1000;
+// A write can be interrupted for a moment when another program touches the new file, for example OneDrive picking
+// it up to synchronize it: Chrome then fails close() with InvalidStateError (seen in the registrar's run). Such a
+// write is retried with a fresh temporary file, 50 ms doubling, about 1.5 s in all, as the Node backend retries a
+// briefly refused rename (M1-11). No final name is touched until the move, so a retry cannot replace anything.
+const WRITE_RETRYABLE = new Set(['InvalidStateError', 'NoModificationAllowedError']);
+const WRITE_RETRIES = 5;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const fail = (code, message) => Object.assign(new Error(message), { code });
 const absent = (e) => e?.name === 'NotFoundError' || e?.name === 'TypeMismatchError';
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
@@ -63,7 +70,7 @@ function randomHex(n) {
  * before the move, so a test can play another origin writing in that window; `now`, the clock for R-W8 (tests).
  */
 export function browserBackend(root, { locks = globalThis.navigator?.locks ?? processLocks, lockScope = 'eps', hooks = {}, now = () => Date.now() } = {}) {
-  const stats = { move: 0, direct: 0 };
+  const stats = { move: 0, direct: 0, retries: 0 };
 
   // Whether `dir` lists an entry `name` of `kind` ('file' or 'directory'). A listed entry that cannot be opened is not
   // absent: on Windows, Chrome lists files whose full path is too long to open, and answers NotFoundError for them.
@@ -111,6 +118,19 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
     }
   }
 
+  // Runs `write`, again after an interrupted write (WRITE_RETRYABLE), at most WRITE_RETRIES more times.
+  async function retrying(write) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await write();
+      } catch (e) {
+        if (!WRITE_RETRYABLE.has(e?.name) || attempt >= WRITE_RETRIES) throw e;
+        stats.retries++;
+        await sleep(50 * 2 ** attempt);
+      }
+    }
+  }
+
   // R-W8: removes temporary files over an hour old from a folder; a younger one may be a write in progress elsewhere.
   async function removeStaleTemps(dir) {
     for await (const [name, handle] of dir.entries()) {
@@ -155,12 +175,21 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
         if (hooks.beforeCreate) await hooks.beforeCreate(path, bytes);
         const dir = await folder(parts.slice(0, -1), true);
         if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
-        const tempName = `${TEMP_PREFIX}${randomHex(6)}`;
-        const temp = await dir.getFileHandle(tempName, { create: true });
-        let moved = false;
+        let tempName = null, moved = false;
         try {
+          const temp = await retrying(async () => {
+            tempName = `${TEMP_PREFIX}${randomHex(6)}`;
+            const handle = await dir.getFileHandle(tempName, { create: true });
+            try {
+              if (typeof handle.move === 'function') await writeAll(handle, bytes);
+              return handle;
+            } catch (e) {
+              try { await dir.removeEntry(tempName); } catch { /* not there */ }
+              tempName = null;
+              throw e;
+            }
+          });
           if (typeof temp.move === 'function') {
-            await writeAll(temp, bytes);
             // The check (R-W9, checked): as close to the move as the API allows.
             if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
             if (hooks.beforeMove) await hooks.beforeMove(path);
@@ -177,11 +206,11 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
             // practice avoids partial files, but that is browser behaviour, not a guarantee (§11).
             if (await kindOf(dir, name)) throw fail('EXISTS', `exists: ${path}`);
             if (hooks.beforeMove) await hooks.beforeMove(path);
-            await writeAll(await dir.getFileHandle(name, { create: true }), bytes);
+            await retrying(async () => writeAll(await dir.getFileHandle(name, { create: true }), bytes));
             stats.direct++;
           }
         } finally {
-          if (!moved) { try { await dir.removeEntry(tempName); } catch { /* not there */ } }
+          if (!moved && tempName) { try { await dir.removeEntry(tempName); } catch { /* not there */ } }
           await removeStaleTemps(dir).catch(() => {});
         }
       });
@@ -192,7 +221,7 @@ export function browserBackend(root, { locks = globalThis.navigator?.locks ?? pr
       return locks.request(`${lockScope}:${parts.join('/')}`, async () => {
         const dir = await folder(parts.slice(0, -1), true);
         if ((await kindOf(dir, name)) === 'dir') throw fail('NOT-A-FILE', `not a file: ${path}`);
-        await writeAll(await dir.getFileHandle(name, { create: true }), bytes);
+        await retrying(async () => writeAll(await dir.getFileHandle(name, { create: true }), bytes));
       });
     },
   };

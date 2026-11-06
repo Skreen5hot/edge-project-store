@@ -36,13 +36,42 @@ async function newFolder(parent, prefix) {
   return parent.getDirectoryHandle(name, { create: true });
 }
 
+// Writes a file directly (not through the backend), retrying an interrupted write as the backend does, and keeps
+// count: {writes, retries, ms (all writes), slowest}. `raw.once` is the plain write, without retries.
+const rawStats = { writes: 0, retries: 0, ms: 0, slowest: 0 };
 async function writeRaw(root, path, bytes) {
   const parts = path.split('/');
   let dir = root;
   for (const s of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(s, { create: true });
-  const w = await (await dir.getFileHandle(parts.at(-1), { create: true })).createWritable();
-  await w.write(bytes);
-  await w.close();
+  const t0 = performance.now();
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const w = await (await dir.getFileHandle(parts.at(-1), { create: true })).createWritable();
+      await w.write(bytes);
+      await w.close();
+      break;
+    } catch (e) {
+      if (!['InvalidStateError', 'NoModificationAllowedError'].includes(e?.name) || attempt >= 5) throw e;
+      rawStats.retries++;
+      await new Promise((r) => setTimeout(r, 50 * 2 ** attempt));
+    }
+  }
+  const ms = performance.now() - t0;
+  rawStats.writes++;
+  rawStats.ms += ms;
+  rawStats.slowest = Math.max(rawStats.slowest, ms);
+}
+const timing = (st) => `${st.writes} writes, ${st.retries} interrupted write(s) retried, ${Math.round(st.ms / Math.max(1, st.writes))} ms each on average, slowest ${Math.round(st.slowest)} ms`;
+
+// The backend with each create and replace timed, for the same figures.
+function timedBackend(dir) {
+  const b = browserBackend(dir);
+  const st = { writes: 0, ms: 0, slowest: 0 };
+  const timed = (fn) => async (...args) => {
+    const t0 = performance.now();
+    try { return await fn(...args); } finally { const ms = performance.now() - t0; st.writes++; st.ms += ms; st.slowest = Math.max(st.slowest, ms); }
+  };
+  return Object.assign(b, { create: timed(b.create), replace: timed(b.replace), timing: () => timing({ ...st, retries: b.stats.retries }) });
 }
 
 async function readRaw(root, path) {
@@ -169,6 +198,7 @@ async function runAutomatic(root) {
   });
 
   await check('M2-h conformance: every example read through the real API equals its expected report', async () => {
+    Object.assign(rawStats, { writes: 0, retries: 0, ms: 0, slowest: 0 });
     // The examples are copied to short paths (e/02, e/03, …): this test is about reading, not path length.
     const dir = await run.getDirectoryHandle('e', { create: true });
     const failed = [];
@@ -188,12 +218,12 @@ async function runAutomatic(root) {
     }
     expect(EXAMPLES.length === 25, `25 examples (found ${EXAMPLES.length})`);
     expect(!failed.length, `differs from expected.jsonld: ${failed.join(', ')}`);
-    return `${EXAMPLES.length} of ${EXAMPLES.length} equal, byte for byte`;
+    return `${EXAMPLES.length} of ${EXAMPLES.length} equal, byte for byte. Copying them: ${timing(rawStats)}`;
   });
 
   await check('M2-h writer: EX-02 written through the real API reproduces the fixture', async () => {
     const root = await run.getDirectoryHandle('writer-ex02', { create: true });
-    const b = browserBackend(root);
+    const b = timedBackend(root);
     const ex = await writeEx02(b);
     let n = 0;
     for (const [path] of ex.files.filter(([p]) => /^(source|normalized|sdd)\/[^/]+$/.test(p) || p === 'edge-project.jsonld')) {
@@ -202,7 +232,7 @@ async function runAutomatic(root) {
     }
     const r = evaluate(await loadTree(b));
     expect(codes(r).length === 0 && r.stages.sdd.status === 'ok', `clean (${codes(r).join(', ')})`);
-    return `${n} files equal the fixture; the project is clean; move() ${b.stats.move}, direct ${b.stats.direct}`;
+    return `${n} files equal the fixture; the project is clean; move() ${b.stats.move}, direct ${b.stats.direct}. Writing them through the EPS backend: ${b.timing()}`;
   });
 
   await check('same origin: two writers racing for the same names never overwrite each other (Web Locks)', async () => {
@@ -302,7 +332,16 @@ async function startProject(prefix) {
 
 const sddArgs = (normalized, text, createdAt) => ({ createdAt, artifacts: [{ role: 'sdd', kind: 'sdd', ext: 'jsonld', generation: 'assisted',
   bytes: enc(text), inputs: [{ role: 'structure', relation: 'dependency', path: normalized }] }] });
-const normalizedOf = async (b) => evaluate(await loadTree(b)).stages.normalized.current[0];
+// The normalized schema of a two-page or race project, or a plain explanation if the other page has not finished
+// creating it (creating takes several seconds per file in a synchronized folder).
+// Checked before anything opens the project: a project caught while the other page creates it may have no project
+// file yet, an incomplete one, or no normalized schema.
+async function normalizedOf(dir, created) {
+  const r = evaluate(await loadTree(browserBackend(dir)));
+  const n = r.valid ? r.stages.normalized.current[0] : undefined;
+  if (!n) throw new Error(`The project from step ${created} (${dir.name}) is not finished yet. Wait until the other page says "Step ${created} done", then press this step again.`);
+  return n;
+}
 
 const twoPageSteps = {
   // Fork: two pages commit from the same head.
@@ -312,15 +351,15 @@ const twoPageSteps = {
   },
   async 'fork-2'() {
     const dir = await newestFolder('two-page');
+    const normalized = await normalizedOf(dir, 1);
     const b = browserBackend(dir, { hooks: { beforeCreate: (path) => (path.startsWith('sdd/revisions/') ? pauseHere(`${dir.name}: this page's SDD is written, its revision is not`) : undefined) } });
-    const p = await openProject(b, TOOLS.sdd);
-    await p.commit('sdd', sddArgs(await normalizedOf(b), '{"written": "page 2, step 2"}\n'));
+    await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(normalized, '{"written": "page 2, step 2"}\n'));
     twoPage(`Step 4 done: this page's revision is written in ${dir.name}. Press step 5 on either page.`, 'ok');
   },
   async 'fork-3'() {
     const dir = await newestFolder('two-page');
-    const b = browserBackend(dir);
-    await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(await normalizedOf(b), '{"written": "page 1, step 3"}\n'));
+    const normalized = await normalizedOf(dir, 1);
+    await (await openProject(browserBackend(dir), TOOLS.sdd)).commit('sdd', sddArgs(normalized, '{"written": "page 1, step 3"}\n'));
     twoPage(`Step 3 done: committed an SDD in ${dir.name}. Now press "Continue" on the other page.`, 'ok');
   },
   async 'fork-check'() {
@@ -340,6 +379,7 @@ const twoPageSteps = {
   async 'race-2'() {
     const dir = await newestFolder('race');
     const name = artifactName('sdd', RACE_TIME, sha256(enc(RACE_TEXT)), 8, 'jsonld');
+    await normalizedOf(dir, 6);
     const b = browserBackend(dir, { hooks: { beforeMove: () => pauseHere(`${dir.name}: this page checked that sdd/${name} is free and is about to move its file there`) } });
     try {
       await b.create(`sdd/${name}`, enc('{"written": "page 2, other bytes under the same name"}\n'));
@@ -350,8 +390,8 @@ const twoPageSteps = {
   },
   async 'race-3'() {
     const dir = await newestFolder('race');
-    const b = browserBackend(dir);
-    const { artifacts } = await (await openProject(b, TOOLS.sdd)).commit('sdd', sddArgs(await normalizedOf(b), RACE_TEXT, RACE_TIME));
+    const normalized = await normalizedOf(dir, 6);
+    const { artifacts } = await (await openProject(browserBackend(dir), TOOLS.sdd)).commit('sdd', sddArgs(normalized, RACE_TEXT, RACE_TIME));
     twoPage(`Step 8 done: committed ${artifacts[0].path} in ${dir.name}. Now press "Continue" on the other page.`, 'ok');
   },
   async 'race-check'() {
@@ -411,7 +451,11 @@ function setup() {
   $('continue').onclick = () => { $('continue').disabled = true; const p = paused; paused = null; p?.resume(); };
   for (const [id, step] of Object.entries(twoPageSteps)) {
     $(id).onclick = async () => {
-      try { await step(); } catch (e) { twoPage(`${e?.message ?? e}`, 'bad'); }
+      // One step at a time: the buttons wait while a step works (a step can take a minute in a synchronized folder).
+      const buttons = Object.keys(twoPageSteps).map((k) => $(k));
+      for (const b of buttons) b.disabled = true;
+      twoPage(`Working on step "${$(id).textContent}"… This can take up to a minute in a OneDrive folder: wait for its "done" message.`);
+      try { await step(); } catch (e) { twoPage(`${e?.message ?? e}`, 'bad'); } finally { for (const b of buttons) b.disabled = !scratch; }
     };
   }
 }

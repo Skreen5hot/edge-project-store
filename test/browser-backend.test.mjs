@@ -65,7 +65,7 @@ for (const move of MOVES) {
     assert.deepEqual(listing, [{ name: 'b.txt', type: 'file' }, { name: 'work', type: 'dir' }], 'no temporary file is left');
     await rejects(b.replace('a', bytesOf('x')), 'NOT-A-FILE');
     await rejects(b.create('a/b.txt/c', bytesOf('x')), 'NOT-A-FOLDER');
-    assert.deepEqual(b.stats, move === 'absent' ? { move: 0, direct: 1 } : { move: 1, direct: 0 });
+    assert.deepEqual(b.stats, move === 'absent' ? { move: 0, direct: 1, retries: 0 } : { move: 1, direct: 0, retries: 0 });
   });
 }
 
@@ -94,6 +94,47 @@ test('M2-f, R-W8: a create removes temporary files over an hour old from its fol
   clock += 15 * 60 * 1000; // the old one is now 65 minutes old, the young one 15
   await b.create('s/new.txt', bytesOf('new'));
   assert.deepEqual((await b.list('s')).map((e) => e.name).sort(), [`${TEMP_PREFIX}young`, 'new.txt']);
+});
+
+// A close() fault for the first `n` writes into `folder` (as OneDrive interrupting Chrome), counting every attempt.
+function interrupted(folder, n, name = 'InvalidStateError') {
+  const seen = { attempts: 0 };
+  return { seen, faults: { close: (p) => (p.startsWith(`${folder}/`) && seen.attempts++ < n ? name : null) } };
+}
+const listNames = async (b, folder) => (await b.list(folder)).map((e) => e.name).sort();
+
+for (const move of MOVES) {
+  test(`M2-f: an interrupted write (InvalidStateError) is retried with a fresh temporary file and succeeds (move() ${move})`, async () => {
+    const { seen, faults } = interrupted('s', 2);
+    const b = fakeBrowserBackend({ move, faults });
+    await b.create('s/a.txt', bytesOf('content'));
+    assert.equal(textOf(await b.read('s/a.txt')), 'content');
+    assert.equal(b.stats.retries, 2);
+    assert.equal(seen.attempts, 3);
+    assert.deepEqual(await listNames(b, 's'), ['a.txt'], 'the interrupted temporary files are gone');
+  });
+}
+
+test('M2-f: a write still interrupted after about 1.5 s fails cleanly; another error fails at once; neither leaves a file', async () => {
+  const always = fakeBrowserBackend({ faults: { close: (p) => (p.startsWith('s/') ? 'InvalidStateError' : null) } });
+  const t0 = Date.now();
+  await assert.rejects(always.create('s/a.txt', bytesOf('x')), (e) => e.name === 'InvalidStateError');
+  const ms = Date.now() - t0;
+  assert.ok(ms >= 1400 && ms < 5000, `gave up after ${ms} ms`);
+  assert.equal(always.stats.retries, 5);
+  assert.deepEqual(await listNames(always, 's'), [], 'no temporary file and no final name are left');
+  const quota = fakeBrowserBackend({ faults: { close: (p) => (p.startsWith('s/') ? 'QuotaExceededError' : null) } });
+  await assert.rejects(quota.create('s/a.txt', bytesOf('x')), (e) => e.name === 'QuotaExceededError');
+  assert.equal(quota.stats.retries, 0, 'only interrupted writes are retried');
+  assert.deepEqual(await listNames(quota, 's'), []);
+});
+
+test('M2-f: replace() of a work file retries an interrupted write too', async () => {
+  const { faults } = interrupted('w', 1);
+  const b = fakeBrowserBackend({ faults });
+  await b.replace('w/work.json', bytesOf('1'));
+  assert.equal(textOf(await b.read('w/work.json')), '1');
+  assert.equal(b.stats.retries, 1);
 });
 
 test('M2-g: every example read through the browser backend equals its expected report', async () => {
