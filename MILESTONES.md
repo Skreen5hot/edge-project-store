@@ -11,7 +11,7 @@ on v0.2.
 | M1 | **Project folders on disk** | Any command-line or Node tool can create, write and inspect a project folder on a local disk or in OneDrive, with conflicts and damage reported; a person can check any project with one command | 3 (Node half) | **validated** on v0.2 by the registrar, 2026-11-05 ([`validation/M1-validation.md`](validation/M1-validation.md)) |
 | M2 | **Project folders in the browser** | A single offline HTML page can open a project folder, keep its permission across restarts and show the project's state, so browser tools such as SDD can use the same folders | 3 (browser half) | **validated** on v0.2 by the registrar, 2026-11-06 ([`validation/M2-validation.md`](validation/M2-validation.md)) |
 | M3 | **SDD project mode (SDD v1.2)** | The SDD tool opens a project, saves SDDs as committed artifacts, resumes unfinished work and reopens a mapping | 4 | needs the SDD-side proposal |
-| M4 | **Packaging and publication** | A pinned single-file module that tools vendor, and the publication decision | — | registrar decision |
+| M4 | **Packaging and publication** | A pinned single-file module that tools vendor, and the publication decision | — | publication: the repository is **public** since 2026-11-06 (registrar's decision, ending D10); packaging: registrar decision |
 | later | Other stages | Normalizer, RML, RDF, graph loader and diagram exporter adopt the module as they are built | later | |
 
 M2 depends on M1 only for shared tests. M3 depends on M2 (the SDD tool is a single HTML page). M4 can follow M2.
