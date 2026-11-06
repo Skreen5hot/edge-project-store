@@ -134,34 +134,55 @@ Agreed with the registrar and done since:
 2. **The two-page steps** show "Working…" and wait for each other; steps 2, 3, 7 and 8 say plainly when the other
    page's project is not finished yet, instead of failing.
 
+## The registrar's third run: accepted (2026-11-06)
+
+Run `run-20261106-201535` on commit `2772f47`, LittleMan, Node v24.11.1, Chrome 156, no uncommitted changes; its
+report and evidence stay in the run folder in OneDrive, outside the repository. Every step gave the expected result:
+
+- **M2-a, M2-i:** the project page's report was byte-identical to `eps report`, as a file on `projects/conflicted`
+  (`729fdee6…`) and from `localhost` on `projects/clean` (`6f6c905c…`).
+- **M2-b:** after closing the browser, the stored folder and its permission were kept, **granted**, on both pages.
+- **M2-c:** with folder access disabled, the plain notice, *Open* greyed out.
+- **M2-h, on a picked folder in OneDrive, on both pages:** 8 of 8. Conformance 25 of 25; copying the examples took 298
+  writes, about 0.45–0.5 s each (slowest 2.5 s); on the file page **4 interrupted writes were retried** and the test
+  passed (the second run's failure). The EPS backend wrote EX-02 at about 0.8 s per file, none retried. Path length as
+  in the second run: project folders up to **145 characters** on this PC.
+- **M2-d, two origins on one picked folder:** the fork left `sdd` conflicted, 2 heads, `E-STAGE-CONFLICT`; in the
+  check-to-move window, `move()` replaced page 1's SDD, and the loss was **reported** (`E-INTEGRITY`,
+  `E-CURRENT-UNRESOLVED`), never silent: the checked level's limit, as R-W9 says.
+- **M2-e:** `NotReadableError` reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable`, on both pages.
+- **M2-f, M2-g, M2-j:** step 1, 156 of 156 tests; `spec/`, `context/`, `schemas/` unchanged since v0.2.
+- No temporary file was left by the backend (the only `.eps-tmp-*` files are EX-10's own, in the copied examples).
+
 ## Results here (2026-11-05)
 
 What I could check on this PC; the registrar column is for your run.
 
 | AC | Evidence | Result here | Registrar |
 |---|---|---|---|
-| M2-a | Chrome 156: the project page opened as a file loads, has the folder picker, and can remember a folder; the same page from `http://localhost` likewise. Picking a folder needs a person | loads, picker present; **picking not tried** (needs a person) | |
-| M2-b | — | **not measured here** (needs a person and a restart) | |
-| M2-c | `M2-c: the page says plainly…` (missing API, insecure page, `SecurityError`, `NotAllowedError`, cancelled); Chrome started with `--disable-blink-features=FileSystemAccessLocal` shows the notice and greys out *Open* | pass; policy-managed Chrome not tried | |
-| M2-d | `M2-d (1)` (a fork across origins is `conflicted`, 2 heads); `M2-d (2)` ×3 (in the window, a replacing `move()` is reported as `E-INTEGRITY`, a refusing one loses nothing); `M2-d: across origins…` (the limit: both checks pass, the later move replaces); Chrome, private storage: **`move()` onto an existing name REPLACES it**; the two-page steps in one Chrome page: the fork is conflicted, and the race loses nothing (Web Locks) | pass in the fake and in one origin; **two origins on a picked folder not tried** | |
-| M2-e | `M2-e: …` (fake: `NotReadableError` on a file and on a folder; a listed file or folder that cannot be opened is `E-UNREADABLE (NotFoundError)`, never missing); Chrome: a stale `File` gives `NotReadableError`, reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable` | pass | |
-| M2-f | the backend tests: interface in three `move()` modes, paths refused never altered, R-W8 stale temporary files, Web Locks in one origin | pass | |
-| M2-g | `M2-g` (25 of 25 examples; EX-02 written in every `move()` mode); `test/project.test.mjs`: 24 writer tests `[browser backend]` | pass | |
-| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 8 of 8 (the path-length measurement finds no limit there, over 950 characters; 298 copies at 15 ms each, none retried; 25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | |
-| M2-i | `M2-i` ×5: every example's page view equals `eps status` and its report equals `eps report` byte for byte; the folder is unchanged; the bundled code computes the same reports; no network address in the pages | pass | |
-| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **156 of 156 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | |
+| M2-a | Chrome 156: the project page opened as a file loads, has the folder picker, and can remember a folder; the same page from `http://localhost` likewise. Picking a folder needs a person | loads, picker present; **picking not tried** (needs a person) | pass (run `run-20261106-201535`): picked a folder on both pages |
+| M2-b | — | **not measured here** (needs a person and a restart) | measured (run `run-20261106-201535`): kept, granted, on both pages |
+| M2-c | `M2-c: the page says plainly…` (missing API, insecure page, `SecurityError`, `NotAllowedError`, cancelled); Chrome started with `--disable-blink-features=FileSystemAccessLocal` shows the notice and greys out *Open* | pass; policy-managed Chrome not tried | pass (run `run-20261106-201535`): notice shown, *Open* greyed out |
+| M2-d | `M2-d (1)` (a fork across origins is `conflicted`, 2 heads); `M2-d (2)` ×3 (in the window, a replacing `move()` is reported as `E-INTEGRITY`, a refusing one loses nothing); `M2-d: across origins…` (the limit: both checks pass, the later move replaces); Chrome, private storage: **`move()` onto an existing name REPLACES it**; the two-page steps in one Chrome page: the fork is conflicted, and the race loses nothing (Web Locks) | pass in the fake and in one origin; **two origins on a picked folder not tried** | pass (run `run-20261106-201535`): two origins on a picked folder, fork conflicted and the replaced SDD reported |
+| M2-e | `M2-e: …` (fake: `NotReadableError` on a file and on a folder; a listed file or folder that cannot be opened is `E-UNREADABLE (NotFoundError)`, never missing); Chrome: a stale `File` gives `NotReadableError`, reported as `E-UNREADABLE … (NotReadableError)`, `sdd unevaluable` | pass | pass (run `run-20261106-201535`), both pages |
+| M2-f | the backend tests: interface in three `move()` modes, paths refused never altered, R-W8 stale temporary files, Web Locks in one origin | pass | pass (run `run-20261106-201535`), step 1 |
+| M2-g | `M2-g` (25 of 25 examples; EX-02 written in every `move()` mode); `test/project.test.mjs`: 24 writer tests `[browser backend]` | pass | pass (run `run-20261106-201535`), step 1 |
+| M2-h | Chrome 156 on `http://localhost`, the test page's automatic tests in the browser's private storage: 8 of 8 (the path-length measurement finds no limit there, over 950 characters; 298 copies at 15 ms each, none retried; 25 of 25 examples byte for byte, EX-02 written through the real API, 20 same-origin races, no temporary file left). As a file, Chrome gives pages no private storage, so there it needs a picked folder | pass on localhost; **file page on a picked folder not tried** | pass (run `run-20261106-201535`): 8 of 8 on both pages, on a picked folder in OneDrive |
+| M2-i | `M2-i` ×5: every example's page view equals `eps status` and its report equals `eps report` byte for byte; the folder is unchanged; the bundled code computes the same reports; no network address in the pages | pass | pass (run `run-20261106-201535`): byte-identical to `eps report` on both pages |
+| M2-j | `npm run check`: 4 schemas current, 25 examples / 324 files match, `src/schemas.mjs` current, 2 pages current, **156 of 156 tests**; `git diff 086b470 -- spec context schemas` is empty | pass | pass (run `run-20261106-201535`), step 1 |
 
 The assistant itself was tested here with a stand-in for the person (answers and saved files), including stopping
 and resuming; that found and fixed one bug (a saved file taken twice when two steps followed quickly).
 
 ## Known limits
 
-- **Writing in a OneDrive folder from Chrome is slow** (about 5–7 seconds per file in the registrar's second run) and
-  can be interrupted for a moment (retried, as above). A commit writes three files or more, so a browser tool saving
-  into OneDrive should show that it is working. The registrar's next run measures it.
+- **Writing in a OneDrive folder from Chrome is slow** (about 5–7 seconds per file in the registrar's second run,
+  about 0.5–0.9 s in the third, slowest 2.5 s) and can be interrupted for a moment (retried, as above: 4 of 298 writes
+  in the third run). A commit writes three files or more, so a browser tool saving into OneDrive should show that it
+  is working.
 
 - **Path length in the browser on Windows.** Chrome cannot write a file whose full path is over about 252 characters
-  directly, or, through the EPS backend's temporary file and `move()`, a little more (your run measures it). A revision
+  directly, or, through the EPS backend's temporary file and `move()`, a little more (259 characters on the registrar's PC). A revision
   path inside a project is 113 characters, so **a project folder's own path must stay under about 140 characters** for
   browser tools; Node (`eps`) has no such limit (387 characters in M1). A file the browser lists but cannot open is
   reported as `E-UNREADABLE (NotFoundError)`, and the project page says the folder is probably too deep. The contract
@@ -185,9 +206,9 @@ and resuming; that found and fixed one bug (a saved file taken twice when two st
 
 | | |
 |---|---|
-| Step 1 (automated checks) | ☐ pass ☐ fail — notes: |
-| Step 2 (in the browser) | ☐ pass ☐ fail — notes: |
-| M2-b (measured) | after a restart, as a file: … ; from localhost: … |
-| M2 criteria (M2-a to M2-j) | ☐ accepted as written ☐ accepted with changes: |
-| M2 accepted | ☐ yes ☐ yes, with conditions ☐ no |
-| Registrar, date | |
+| Step 1 (automated checks) | ☒ pass ☐ fail — notes: 156 of 156 tests; schemas, examples, `src/schemas.mjs` and the pages current; `spec/`, `context/`, `schemas/` unchanged since v0.2 |
+| Step 2 (in the browser) | ☒ pass ☐ fail — notes: run `run-20261106-201535` with the validation assistant (`validation/m2-validate.mjs`) on commit `2772f47`, LittleMan, Node v24.11.1, Chrome 156; every step gave the expected result (above). Earlier runs `run-20261105-…` found the path-length and OneDrive-write failures fixed in `952df69` and `2772f47` |
+| M2-b (measured) | folder access kept and permission still granted after a browser restart, on the file page and the localhost page (Chrome 156) |
+| M2 criteria (M2-a to M2-j) | ☒ accepted as written ☐ accepted with changes: |
+| M2 accepted | ☒ yes ☐ yes, with conditions ☐ no |
+| Registrar, date | Aaron Damiano, 2026-11-06 |
