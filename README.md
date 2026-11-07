@@ -4,9 +4,9 @@ A shared project folder for offline, edge-canonical data pipelines, and one smal
 pipeline reuses to read and write it.
 
 **Status:** contract **v0.2** (2026-11-04): the contract, its JSON-LD context and JSON Schemas, and 25 synthetic
-example projects with their expected evaluation reports; v0.1 is kept at the tag `eps-v0.1`. Module (slice 2) and
-M1 (project folders on disk) are built and validated; M2 (project folders in the browser) is built and awaiting
-validation. See [`PROPOSAL.md`](PROPOSAL.md) for the decisions and
+example projects with their expected evaluation reports; v0.1 is kept at the tag `eps-v0.1`. Module (slice 2),
+M1 (project folders on disk) and M2 (project folders in the browser) are built and validated; M3 (SDD project mode)
+is SDD's. See [`PROPOSAL.md`](PROPOSAL.md) for the decisions and
 [`MILESTONES.md`](MILESTONES.md) for the plan.
 
 ## The idea
@@ -46,6 +46,32 @@ report of what is current, out of date, in conflict, damaged, or not evaluable b
 
 Run everything with `npm run check` (Node 22 or later, no dependencies): the examples, the embedded schemas and the
 generated pages are verified, then all tests run.
+
+## Using the module in a browser tool
+
+A browser tool vendors these files, copied from one tagged commit and pinned by SHA-256. They are plain ES modules
+with no dependencies and no imports outside this list, so they can be inlined into a single page:
+
+| File | Needed for |
+|---|---|
+| `src/index.mjs` | the entry point |
+| `src/contract.mjs`, `src/sha256.mjs`, `src/jsonschema.mjs`, `src/schemas.mjs` | the evaluation, names, canonical bytes and schemas |
+| `src/project.mjs` | the writer rules: `loadTree`, `createProject`, `openProject` |
+| `src/memory-backend.mjs` | a project in memory (tests, previews) |
+| `src/browser-backend.mjs` | a project folder through the File System Access API |
+| `browser/access.mjs` | optional: opening a folder, and the plain words when it cannot be opened (M2-c) |
+| `browser/handle-store.mjs` | optional: remembering the folder across restarts (IndexedDB) |
+
+`src/node-backend.mjs` and `src/summary.mjs` are for Node and the `eps` tool only. This list changes only with a new
+module version.
+
+**Module versions** are tags `eps-module-v<version>`; `eps-module-v0.2.0` implements contract v0.2. How the module is
+packaged beyond that is the registrar's decision (M4).
+
+**Committing only on what the person saw.** `commit()` and `merge()` take an optional `expectedHeads`: the stage's
+heads (revision paths, as the report lists them) that the tool showed the person. If the heads differ when the write
+starts, nothing is written and the call fails with `HEADS-CHANGED`; R-W5 (`STAGE-CHANGED`) covers the rest of the
+write. Across origins and machines this narrows the window, as R-W5 does; it does not close it (§9).
 
 ## Principles
 

@@ -10,7 +10,7 @@ on v0.2.
 |---|---|---|---|---|
 | M1 | **Project folders on disk** | Any command-line or Node tool can create, write and inspect a project folder on a local disk or in OneDrive, with conflicts and damage reported; a person can check any project with one command | 3 (Node half) | **validated** on v0.2 by the registrar, 2026-11-05 ([`validation/M1-validation.md`](validation/M1-validation.md)) |
 | M2 | **Project folders in the browser** | A single offline HTML page can open a project folder, keep its permission across restarts and show the project's state, so browser tools such as SDD can use the same folders | 3 (browser half) | **validated** on v0.2 by the registrar, 2026-11-06 ([`validation/M2-validation.md`](validation/M2-validation.md)) |
-| M3 | **SDD project mode (SDD v1.2)** | The SDD tool opens a project, saves SDDs as committed artifacts, resumes unfinished work and reopens a mapping | 4 | needs the SDD-side proposal |
+| M3 | **SDD project mode (SDD v1.2)** | The SDD tool opens a project, saves SDDs as committed artifacts, resumes unfinished work and reopens a mapping | 4 | criteria accepted 2026-11-07; SDD builds it (prop-005) |
 | M4 | **Packaging and publication** | A pinned single-file module that tools vendor, and the publication decision | — | publication: the repository is **public** since 2026-11-06 (registrar's decision, ending D10); packaging: registrar decision |
 | later | Other stages | Normalizer, RML, RDF, graph loader and diagram exporter adopt the module as they are built | later | |
 
@@ -63,3 +63,35 @@ M2-a, M2-b and M2-d need. Nothing is published; publication stays the registrar'
 
 **Out of scope for M2:** any SDD change (M3, SDD v1.2), packaging, publication (M4), and writing from the project
 page (M2-i reads only; writing in the browser is exercised by the backend tests and the test page).
+
+## M3: SDD project mode, SDD v1.2 (criteria accepted 2026-11-07)
+
+SDD's side of M3 is SDD's proposal **prop-005, revision 2** (`Skreen5hot/SemanticDataDictionary`,
+`review/proposals/prop-005/prop-005.md` at `f38a630146fd1f90195854d4b27b326542c67614`, sha256
+`456131eec3640db73417171f5524f00ccb029c0f5c8290cb35b78e315ab1aee4`), sent in
+`SDD-EPS-2026-11-06-m3-proposal-corrected` (`communications/sdd/incoming/`). The registrar approved its direction on
+2026-11-06 (SDD's ADR-010). It asks for **no change to the contract** (v0.2).
+
+**The registrar's decisions on that message (2026-11-07):**
+
+1. The criteria below, prop-005 §10, are M3's, **as written**. M3-9 waits for the Schema service's contract and is
+   not needed for M3 sign-off.
+2. The module gains an option to commit only on the heads the person saw: `expectedHeads` on `commit()` and
+   `merge()`, refused with `HEADS-CHANGED` before anything is written. A module change, not a contract change.
+3. The browser module's files are listed in [`README.md`](README.md) ("Using the module in a browser tool"), and each
+   module version is a tag `eps-module-v<version>`, starting with `eps-module-v0.2.0`. The rest of packaging stays
+   with M4.
+
+| AC | Criterion (prop-005 §10, word for word) |
+|---|---|
+| M3-1 | SDD opens a project folder, on a `file:` page and on the published page. It shows each stage's status from the EPS evaluation and lists the candidate inputs |
+| M3-2 | A first SDD built from a source schema in `source/` is committed. Its record matches §2, and `eps status` reports it `[up to date]` |
+| M3-3 | **Rerun.** A rerun commits an SDD citing the previous one as `history`, and `eps status` reports it up to date (the EX-19 case). A regression test shows that the same SDD cited as `dependency` is `UPSTREAM-OUT-OF-DATE` (the EX-20 case), and that SDD never writes `dependency` on an earlier SDD. Tests show each of R1–R6 reopening exactly the mappings §2.1 requires, including propagation. They also show that a mapping is never carried on a matching key alone. Mappings that nothing affected are carried byte for byte |
+| M3-4 | **Resume.** Closing and reopening the browser mid-session resumes from `sdd/work/` with nothing lost. Autosaves never overlap. After a failed save (injected), the decisions are still in memory and are saved by the next save or by *Export work*. After a commit, the session stays until removed, and removal states what it discards |
+| M3-5 | **Detection.** D1–D6 are each detected, in tests and in the two-PC check. D2: no commit supersedes a newer head without the person's confirmation naming it, and the after-commit check reports a head that arrived during the commit. D4: a conflict copy of the same session is shown as one diverged session, and nothing is merged automatically |
+| M3-6 | A fork from two PCs is shown as conflicted, and a person resolves it from the page |
+| M3-7 | With folder access disabled, the page explains, and the single-file fallback works |
+| M3-8 | **Build and pins.** The vendored EPS module matches its PROVENANCE pins at the named commit, and a changed byte fails the check. The page makes no network request, is byte-reproducible, and works from `file:`. The SDD output format and `sddVersion` 2 are unchanged. Every existing operator scene and witness still passes, except the C-S6/C-S7 witnesses that §2.1 changes, which are re-issued through the independent generator |
+| M3-9 | **Later, not for M3 sign-off:** when the Schema service's contract exists, SDD's normalized-schema reader gets its own conformance check against it (N1–N9, K1–K4). M3 itself proceeds on the Jira stopgap |
+
+SDD builds and validates M3 in its own repository; the sign-off is the registrar's, as for M1 and M2.

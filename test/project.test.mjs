@@ -289,6 +289,46 @@ test('R-W5: a revision that appears while writing stops the commit', async () =>
   assert.deepEqual([r.stages.sdd.status, codes(r)], ['ok', ['W-UNCOMMITTED']]);
 });
 
+test('expectedHeads: a head that arrives after the person confirmed stops the commit before anything is written', async () => {
+  const backend = await freshProject(recordingBackend());
+  await writeChain(backend);
+  const sddArtifact = (s) => ({ role: 'sdd', kind: 'sdd', ext: 'jsonld', generation: 'assisted', bytes: bytesOf(s) });
+  const sdd = await openProject(backend, tools.sdd);
+  // An empty stage: the person saw no SDD.
+  await rejects(sdd.commit('sdd', { artifacts: [sddArtifact('{"a":1}')], expectedHeads: 'none' }), 'BAD-ARGUMENT');
+  const first = await sdd.commit('sdd', { artifacts: [sddArtifact('{"a":1}')], createdAt: '2026-11-01T10:00:00Z', expectedHeads: [] });
+  // The person confirms the heads they were shown; another instance commits before they press Save.
+  const seen = (await sdd.evaluate()).stages.sdd.heads;
+  assert.deepEqual(seen, [first.revision]);
+  const other = await (await openProject(backend, tools.sdd)).commit('sdd', { artifacts: [sddArtifact('{"other":1}')], createdAt: '2026-11-01T10:01:00Z' });
+  const writes = backend.log.length;
+  await rejects(sdd.commit('sdd', { artifacts: [sddArtifact('{"b":1}')], createdAt: '2026-11-01T10:02:00Z', expectedHeads: seen }), 'HEADS-CHANGED');
+  assert.equal(backend.log.length, writes, 'nothing was written');
+  assert.deepEqual(codes(await sdd.evaluate()), []);
+  // Shown the new head and confirming it, the person's commit goes through.
+  const { revision } = await sdd.commit('sdd', { artifacts: [sddArtifact('{"b":1}')], createdAt: '2026-11-01T10:02:00Z', expectedHeads: [other.revision] });
+  const r = await sdd.evaluate();
+  assert.deepEqual([r.stages.sdd.status, r.stages.sdd.heads], ['ok', [revision]]);
+});
+
+test('expectedHeads in merge(): the person chose among the heads they were shown', async () => {
+  const base = await freshProject();
+  await writeChain(base);
+  const sddArtifact = (s) => ({ role: 'sdd', kind: 'sdd', ext: 'jsonld', generation: 'assisted', bytes: bytesOf(s) });
+  const pcA = memoryBackend({ tree: cloneTree(base.tree) });
+  const pcB = memoryBackend({ tree: cloneTree(base.tree) });
+  const a = await (await openProject(pcA, tools.sdd)).commit('sdd', { artifacts: [sddArtifact('{"a":1}')], createdAt: '2026-11-01T10:00:00Z' });
+  const b = await (await openProject(pcB, tools.sdd)).commit('sdd', { artifacts: [sddArtifact('{"b":1}')], createdAt: '2026-11-01T10:05:00Z' });
+  const synced = memoryBackend({ tree: cloneTree(pcA.tree) });
+  for (const [name, node] of nodeAt(pcB.tree, 'sdd').entries) if (name !== 'revisions') put(synced.tree, `sdd/${name}`, node);
+  for (const [name, node] of nodeAt(pcB.tree, 'sdd/revisions').entries) put(synced.tree, `sdd/revisions/${name}`, node);
+  const sdd = await openProject(synced, tools.sdd);
+  const current = [{ role: 'sdd', path: a.artifacts[0].path }];
+  await rejects(sdd.merge('sdd', { current, expectedHeads: [a.revision] }), 'HEADS-CHANGED');
+  const { revision } = await sdd.merge('sdd', { current, createdAt: '2026-11-01T11:00:00Z', expectedHeads: [b.revision, a.revision] });
+  assert.deepEqual((await sdd.evaluate()).stages.sdd.heads, [revision]);
+});
+
 test('§9, R-W3: a fork across machines conflicts; commits are refused until a person merges', async () => {
   const base = await freshProject();
   await writeChain(base);

@@ -16,7 +16,7 @@ const PLACE_ATTEMPTS = 4;
 /**
  * A writer refusal or failure. `code` is the contract's E-NAME-TAKEN (R-W1) or one of this module's own codes:
  * NOT-A-PROJECT, PROJECT-EXISTS, NOT-RESPONSIBLE, BAD-ARGUMENT, INPUT-NOT-REGISTERED, REFUSED-DAMAGED,
- * REFUSED-INCOMPLETE, REFUSED-UNEVALUABLE, REFUSED-CONFLICTED, NOT-CONFLICTED, STAGE-CHANGED.
+ * REFUSED-INCOMPLETE, REFUSED-UNEVALUABLE, REFUSED-CONFLICTED, NOT-CONFLICTED, STAGE-CHANGED, HEADS-CHANGED.
  */
 export class EpsWriteError extends Error {
   constructor(code, message) {
@@ -302,6 +302,21 @@ export async function openProject(backend, { tool, version, responsibilities = [
     if (s.status !== 'conflicted' && merging) throw new EpsWriteError('NOT-CONFLICTED', `${stage} has no conflict to merge`);
   }
 
+  // The optional `expectedHeads` of commit() and merge(): the stage's heads (revision paths, as the report lists
+  // them) that the caller showed a person. If the stage's heads are not exactly those when the write starts, nothing
+  // is written. R-W5 then covers the rest of the write, so no head the person did not see becomes a parent.
+  function requireExpectedHeads(report, stage, expectedHeads) {
+    if (expectedHeads === undefined) return;
+    if (!Array.isArray(expectedHeads) || !expectedHeads.every((h) => typeof h === 'string')) {
+      throw new EpsWriteError('BAD-ARGUMENT', 'expectedHeads is a list of revision paths');
+    }
+    const heads = report.stages[stage].heads;
+    const expected = [...new Set(expectedHeads)].sort(compare);
+    if (expected.length !== heads.length || expected.some((h, i) => h !== heads[i])) {
+      throw new EpsWriteError('HEADS-CHANGED', `${stage}'s heads are ${heads.length ? heads.join(', ') : 'none'}, not the ${expected.length ? expected.join(', ') : 'none'} expected; nothing was written`);
+    }
+  }
+
   const revisionNames = async (stage) =>
     ((await backend.list(`${stage}/revisions`)) ?? []).map((e) => e.name).sort(compare).join('\n');
 
@@ -356,14 +371,16 @@ export async function openProject(backend, { tool, version, responsibilities = [
 
     /**
      * R-W2: artifacts and their records, then one revision making them current, with `keep` ([{role, path}]) for
-     * existing artifacts that stay current. artifacts: as writeArtifact, plus `role`. Returns {revision, artifacts}.
+     * existing artifacts that stay current. artifacts: as writeArtifact, plus `role`. `expectedHeads` (optional): the
+     * heads the caller expects, refused with HEADS-CHANGED otherwise. Returns {revision, artifacts}.
      */
-    async commit(stage, { artifacts = [], keep = [], createdAt }) {
+    async commit(stage, { artifacts = [], keep = [], createdAt, expectedHeads }) {
       requireStage(stage);
       // R-W5: the names are taken before the evaluation, so a revision that appears at any point after it is caught.
       const before = await revisionNames(stage);
       const report = await evaluateNow();
       requireWritable(report, stage, { merging: false });
+      requireExpectedHeads(report, stage, expectedHeads);
       const time = timing(createdAt);
       // Every argument is checked before the first file is created.
       const prepared = artifacts.map((a) => {
@@ -379,12 +396,16 @@ export async function openProject(backend, { tool, version, responsibilities = [
       return { revision, artifacts: written.map(({ path, sha256: s }) => ({ path, sha256: s })) };
     },
 
-    /** R-W3: once a person has chosen, a merge revision whose parents are all the heads. current: [{role, path}]. */
-    async merge(stage, { current, createdAt }) {
+    /**
+     * R-W3: once a person has chosen, a merge revision whose parents are all the heads. current: [{role, path}].
+     * `expectedHeads` (optional): the heads the person chose among, as in commit().
+     */
+    async merge(stage, { current, createdAt, expectedHeads }) {
       requireStage(stage);
       const before = await revisionNames(stage); // R-W5, as in commit()
       const report = await evaluateNow();
       requireWritable(report, stage, { merging: true });
+      requireExpectedHeads(report, stage, expectedHeads);
       return { revision: await publish(stage, report, before, current, timing(createdAt)) };
     },
 
